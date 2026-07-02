@@ -47,7 +47,7 @@ docker compose watch                 # 開発ループ(develop.watch 設定時)
   llm はモデルロードが遅いので `start_period` を長めに(数分)
 - **restart: unless-stopped** を全常駐サービスに(one-shot の `migrate` は除く — `restart: "no"`)
 - **開発ループは develop.watch**: moka-core / moka-web に `develop.watch`(`sync` + `rebuild`)を書き、`docker compose watch` で回す
-- 秘密値は `.env`(gitignore 済み)から。compose.yaml に直書きしない
+- 秘密値はファイルベース **Docker secrets**(`secrets/` — gitignore 済み、初回手順は secrets/README.md)。compose.yaml・.env への直書きをしない。コンテナ側は `*_FILE` 系(例 `POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password`)で受ける
 
 ## サービス構成(常駐上限 5 — 増やす前に tenets §2-3 を読む)
 

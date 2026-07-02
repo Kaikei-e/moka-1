@@ -1,1 +1,14 @@
 draft_*.md
+
+# 秘密値
+.env
+secrets/*
+!secrets/README.md
+
+# 起動時に自動 DL される GGUF 置き場(tenets §5)
+models/*
+!models/.gitkeep
+
+# Plecto の開発用自己署名証明書は named volume 側に生成される(certs/ は mountpoint のみ)
+plecto/certs/*
+!plecto/certs/.gitkeep
