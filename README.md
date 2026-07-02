@@ -1,31 +1,34 @@
 # moka-1
 
-`docker compose up -d` 一発で起動して常駐する、エージェント型 RSS フィードリーダー。
-[Plecto](https://github.com/Kaikei-e/Plecto) のドッグフーディングプロジェクトを兼ねる。
-設計は [docs/tenets/moka-tenets.md](docs/tenets/moka-tenets.md)、決定記録は [docs/adr/](docs/adr/)。
+**moka** = **M**ixture **o**f **K**nowledge **A**gent.
+An agentic RSS feed reader that starts with a single `docker compose up -d` and keeps working in the background.
+Also the dogfooding project for [Plecto](https://github.com/Kaikei-e/Plecto).
+Design principles live in [docs/tenets/moka-tenets.md](docs/tenets/moka-tenets.md), decisions in [docs/adr/](docs/adr/).
 
-## 起動
+English · [日本語](README.ja.md)
+
+## Getting started
 
 ```bash
 git clone https://github.com/Kaikei-e/moka-1 && cd moka-1
-openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt  # 初回のみ(secrets/README.md)
+openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt  # once per clone (see secrets/README.md)
 docker compose up -d --wait
 ```
 
-- UI: https://localhost/ (開発用自己署名証明書なので警告が出る)
-- エッジ admin: http://localhost:9099/metrics (ホストローカルのみ)
+- UI: https://localhost/ (self-signed dev certificate, so expect a browser warning)
+- Edge admin: http://localhost:9099/metrics (host-local only)
 
-初回は LLM モデル(~5.2GB)の自動ダウンロードが走るため `--wait` が数分かかる。
-LLM が落ちていても RSS リーダーとしては動く(fail-soft)。
+The first start downloads the LLM model (~5.2 GB), so `--wait` takes a few minutes.
+If the LLM is down, moka still works as a plain RSS reader (fail-soft).
 
-## 構成(常駐 5 サービス)
+## Layout (5 resident services)
 
-| サービス | 技術 | 役割 |
+| Service | Tech | Role |
 |---|---|---|
-| [plecto](plecto/) | Plecto (Rust + WASM filters) | エッジ: TLS 終端、HTTP/1·2·3、ルーティング |
-| moka-core ([core/](core/)) | Go 単一バイナリ | API + 常駐エージェント(取得/濃縮/リキャップ) |
-| moka-web ([web/](web/)) | SvelteKit SSR | 読むための UI |
-| db ([db/](db/)) | PostgreSQL 18 + pgvector | 記事・フィード・埋め込み・ジョブ状態のすべて |
-| llm | llama.cpp server (Vulkan) | ローカル推論 |
+| [plecto](plecto/) | Plecto (Rust + WASM filters) | Edge: TLS termination, HTTP/1·2·3, routing |
+| moka-core ([core/](core/)) | Single Go binary | API + resident agent (fetch / enrich / recap) |
+| moka-web ([web/](web/)) | SvelteKit SSR | The reading UI |
+| db ([db/](db/)) | PostgreSQL 18 + pgvector | Articles, feeds, embeddings, job state — everything |
+| llm | llama.cpp server (Vulkan) | Local inference |
 
-マイグレーションは one-shot の `migrate` ジョブ(Atlas)が起動時に自動適用する。
+Migrations are applied automatically at startup by the one-shot `migrate` job (Atlas).
