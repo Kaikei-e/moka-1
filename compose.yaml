@@ -1,0 +1,151 @@
+# moka-1 — `docker compose up -d --wait` 一発で全部が上がる(tenets §2-1)
+# 常駐サービス = 5: plecto / moka-core / moka-web / db / llm(tenets §2-3)
+# migrate は one-shot ジョブ(ADR00001)で常駐上限には数えない
+name: moka
+
+services:
+  # エッジ: TLS 終端、HTTP/1·2·3、ルーティング。Phase 1 は素通し(plecto/manifest.toml)。
+  # upstream が落ちていても 503 で立ち続けるので depends_on は張らない(エッジは独立)。
+  plecto:
+    build: ./plecto
+    restart: unless-stopped
+    ports:
+      - "443:443/tcp" # HTTP/1.1 + HTTP/2 (TLS)
+      - "443:443/udp" # HTTP/3 (QUIC)
+      - "127.0.0.1:9099:9099" # admin (/metrics /healthz /readyz) — ホストローカルのみ
+    volumes:
+      - ./plecto:/run/plecto:ro # manifest.toml(+ Phase 2 以降の filters/)
+      - plecto-certs:/run/plecto/certs # 自己署名証明書(entrypoint.sh が初回生成)
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9099/readyz"]
+      interval: 30s
+      start_period: 30s
+      start_interval: 2s
+
+  # API + 常駐エージェントループ(Go 単一バイナリ)
+  moka-core:
+    build: ./core
+    restart: unless-stopped
+    environment:
+      # パスワードは secret から(store 層が POSTGRES_PASSWORD_FILE を読んで DSN に合成する契約)
+      DATABASE_URL: postgres://moka@db:5432/moka?sslmode=disable
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      LLM_BASE_URL: http://llm:8081/v1
+    secrets:
+      - postgres_password
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      migrate:
+        condition: service_completed_successfully
+      # llm は入れない — fail-soft: LLM が死んでも RSS リーダーとしては動く(tenets §2-6)
+    healthcheck:
+      test: ["CMD", "/moka", "healthz"] # distroless に curl は無い
+      interval: 30s
+      start_period: 30s
+      start_interval: 2s
+    develop:
+      watch:
+        - action: rebuild
+          path: ./core
+          ignore:
+            - "**/*_test.go"
+
+  # 読むための UI(SvelteKit SSR / adapter-node)
+  moka-web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      MOKA_CORE_URL: http://moka-core:8080 # moka-core へはサーバー側から(bp-svelte §11)
+      ORIGIN: https://localhost # エッジ(Plecto)経由の form actions の origin 検査用
+    depends_on:
+      moka-core:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      start_period: 30s
+      start_interval: 2s
+    develop:
+      watch:
+        - action: rebuild
+          path: ./web/src
+
+  # 記事、フィード、埋め込み、ジョブ状態、すべてここ(単一 DB — tenets §2-4)
+  db:
+    image: pgvector/pgvector:0.8.4-pg18-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: moka
+      POSTGRES_DB: moka
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    ports:
+      - "127.0.0.1:5432:5432" # atlas migrate diff / psql デバッグ用
+    volumes:
+      - db-data:/var/lib/postgresql # PG18 イメージは data ではなくここが volume
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moka -d moka"]
+      interval: 30s
+      start_period: 30s
+      start_interval: 2s
+
+  # one-shot: Atlas マイグレーション適用(ADR00001)。実行後 exit 0
+  migrate:
+    image: arigaio/atlas:1.2.3-community-alpine # secret をコマンドに合成するため sh 入りの alpine 変種
+    entrypoint: ["/bin/sh", "-c"]
+    # sh -c に 1 引数で渡すためリスト形式必須(文字列だと compose が分割する)。
+    # $$ は compose の変数展開エスケープ(コンテナ内の sh が評価する)
+    command:
+      - 'atlas migrate apply --url "postgres://moka:$$(cat /run/secrets/postgres_password)@db:5432/moka?sslmode=disable" --dir file:///migrations'
+    secrets:
+      - postgres_password
+    volumes:
+      - ./db/migrations:/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # ローカル推論(Vulkan 固定 — gfx1150 は ROCm 非対応、tenets §3.3)
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan-b9859 # pin。更新は eval/ の速度実測とセットで
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri # iGPU パススルー
+    group_add:
+      - video
+      - "992" # render(コンテナ /etc/group に render が無いのでホストの GID 数値で。getent group render)
+    environment:
+      LLAMA_CACHE: /models # -hf の自動 DL 先を bind mount へ
+    # 高速パス: LFM2.5-8B-A1B Q4_K_M(tenets §3.3)。提案層・集約層のモデルは M1 以降で編成
+    command: >-
+      -hf LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M
+      --host 0.0.0.0 --port 8081 -ngl 99
+    ports:
+      - "127.0.0.1:8081:8081" # eval/ とデバッグ用
+    volumes:
+      - ./models:/models
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 30s
+      start_period: 20m # 初回はモデル自動 DL(~5.2GB)+ロードで長い
+      start_interval: 5s
+
+volumes:
+  plecto-certs:
+  db-data:
+
+# 機微情報はファイルベース secret で渡す(環境変数直書き禁止)。
+# 初回のみ: secrets/README.md の手順で postgres_password.txt を作る(gitignore 済み)
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
