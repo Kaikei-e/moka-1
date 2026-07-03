@@ -1,0 +1,113 @@
+{
+  "week_id": "week-1",
+  "entries": [
+    {
+      "title": "UNIX系コマンドをWindowsに移植／macOS上にLinuxコンテナを統合／Ubuntu、開発環境をコマンド一発で構築ほか、2026年6月の人気記事",
+      "summary": "枕は一度買えばずっと使えるものと思っていたのですが、どうやらへたってきたりつぶれてきたりしたら買い換えた方がいいらしい、ということを最近知りました。今使ってる枕、一体何年使ってきたんだ……。 というわけで今、新しい枕を買うべくネットやお店で...",
+      "url": "https://www.publickey1.jp/blog/26/unixwindowsmacoslinuxubuntu20266.html",
+      "lang": "ja"
+    },
+    {
+      "title": "DNSを基盤にAIエージェントに信頼できる名前を与える「Agent Name Service（ANS）」、立ち上げ意向をLinux Foundationが発表",
+      "summary": "Linux Foundationは、既存のドメインネームシステム（DNS）基盤を拡張してインターネット上で稼働するAIエージェントに信頼できる識別子としての名前などを提供する新しいオープンソース標準「Agent Name Service（A...",
+      "url": "https://www.publickey1.jp/blog/26/dnsaiagent_name_serviceanslinux_foundation.html",
+      "lang": "ja"
+    },
+    {
+      "title": "静的サイトジェネレータ「Astro 7.0」正式リリース、ビルドシステムがVite 8/Rolldownに、Rust製コンパイラ採用で高速化",
+      "summary": "静的サイトジェネレータ「Astro」の最新版となる「Astro 7.0」正式版がリリースされました。 Astro 7 is here! A new Rust compiler, a new Rust Markdown/MDX process...",
+      "url": "https://www.publickey1.jp/blog/26/astro_70vite_8rolldownrust.html",
+      "lang": "ja"
+    },
+    {
+      "title": "GoogleユーザーのIPv6利用率がついに50％を超えたことが判明",
+      "summary": "Googleが提供しているサービスを利用するユーザーのうち、IPv6を使用している割合を示す「Google IPv6」のページで、IPv6の割合が今年（2026年）3月に50％を超えていたことが分かりました。 公開されたグラフによると最初に...",
+      "url": "https://www.publickey1.jp/blog/26/googleipv650.html",
+      "lang": "ja"
+    },
+    {
+      "title": "Windows上でLinuxコンテナが動く「WSL Containers」がパブリックプレビュー。Windowsファイルへのアクセスが2倍高速に",
+      "summary": "マイクロソフトは、WSL（Windows Subsystem for Linux）の新機能としてWindows上でLinuxコンテナが動く「WSL Containers」のパブリックプレビューを公開しました。 WindowsにはWindow...",
+      "url": "https://www.publickey1.jp/blog/26/windowslinuxwsl_containerswindows2.html",
+      "lang": "ja"
+    },
+    {
+      "title": "クアルコムがPythonライクな新言語「Mojo」開発元のModular社買収を発表。AIデータセンター市場へ本格参入",
+      "summary": "スマートフォン用のSoC（System-on-a-Chip）や各種通信機器向けの半導体事業などで知られるクアルコムテクノロジーズ社（以下、クアルコム）は、AI処理の高速化を目指すPythonライクな新言語「Mojo」の開発元であるModul...",
+      "url": "https://www.publickey1.jp/blog/26/pythonmojomodularai.html",
+      "lang": "ja"
+    },
+    {
+      "title": "Deno 2.9正式リリース。起動が2倍速、消費メモリは半分に。WebViewを用いたデスクトップアプリが作れる「Deno Desktop」など",
+      "summary": "JavaScript/TypeScriptランタイムのDenoを開発するDeno Landは、Deno 2.9正式版をリリースしました。 Deno 2.9は起動を2倍速にするなどの性能面での大幅向上や、Denoを基盤にJavaScriptや...",
+      "url": "https://www.publickey1.jp/blog/26/deno_292webviewdeno_desktop.html",
+      "lang": "ja"
+    },
+    {
+      "title": "AWS Lambda MicroVMs登場。サーバレスの手軽さでステートフルかつ隔離された実行環境を提供",
+      "summary": "Amazon Web Servicesは、AWS Lambda上で一時的にステートフルな実行環境をMicroVMによって安全に隔離された状態で用意できる新サービス「AWS Lambda Micro VMs」を発表しました。 AWS Lamb...",
+      "url": "https://www.publickey1.jp/blog/26/aws_lambda_microvms.html",
+      "lang": "ja"
+    },
+    {
+      "title": "TypeScriptコンパイラをGo言語に移植することで10倍速にしたTypeScript 7.0リリース候補版が登場",
+      "summary": "マイクロソフトは、TypeScriptをGo言語に移植した最初のバージョンとなる「TypeScript 7.0」リリース候補版のリリースを発表しました。 TypeScript 7's Release Candidate is now...",
+      "url": "https://www.publickey1.jp/blog/26/typescriptgo10typescript_70.html",
+      "lang": "ja"
+    },
+    {
+      "title": "GitHub、AIによる雑なプルリクエストを抑制へ。ユーザー当たりのプルリクエスト数の上限を設定できる新機能導入",
+      "summary": "GitHubは、ユーザーに対してプルリクエスト数の上限を設定できる新機能の導入を発表しました。 Pull requests are easier to open than ever, but every review still takes...",
+      "url": "https://www.publickey1.jp/blog/26/githubai_1.html",
+      "lang": "ja"
+    },
+    {
+      "title": "AWS、コードだけでなくインフラ構成とビジネスコンテキストも理解した上で脆弱性を推論する「AWS Contiuum」発表。特定のAIモデルに依存せず",
+      "summary": "Amazon Web Services（AWS）は、コードをスキャンするだけでなく、インフラ構成やアクセス許可、ネットワークトポロジーそしてビジネス上の優先事項やドキュメントなどの非構造化データなどをコンテキストとして活用し、システムの脆弱...",
+      "url": "https://www.publickey1.jp/blog/26/awsaws_contiuumai.html",
+      "lang": "ja"
+    },
+    {
+      "title": "AWS、AIエージェントがリポジトリを自動スキャンして技術的負債を指摘してくれる「AWS Transform – continuous modernization」プレビュー公開",
+      "summary": "Amazon Web Services（AWS）は、AIエージェントがコードリポジトリを継続的に自動スキャンし、サポートが終了したライブラリやフレームワークなどを始めとする技術的負債を検出し、優先順位をつけて報告あるいは修正のためのプルリク...",
+      "url": "https://www.publickey1.jp/blog/26/awsaiaws_transform_continuous_modernization.html",
+      "lang": "ja"
+    },
+    {
+      "title": "GLM-5.2の開発元による中国製AIエージェントアプリ「ZCode」、AnthropicやOpenAIのAIモデルも活用可能",
+      "summary": "中国企業のZ.aiはClaude Opus 4.8などの高性能クローズドモデルに匹敵する性能のAIモデルをオープンモデルとして公開しており、API経由でのAIサービスも展開しています。そんなZ.aiはClaude CodeやCodexに似たAIエージェントアプリ「ZCode」もリリースしています。<p><b><a href=\"https://gigazine.net/news/20260702&#45;zcode&#45;ai&#45;agent/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-zcode-ai-agent/",
+      "lang": "ja"
+    },
+    {
+      "title": "オープンソースのゲームエンジン「Godot」がAI製コードを今後受け付けないことを決定、AIを多用するユーザーが自分のコードを十分に理解して修正できるとは限らないため",
+      "summary": "「Slay the Spire 2」や「Brotato」などのゲームを支えるオープンソースのゲームエンジン「Godot」が、AIで生成した大量のプルリクエストに悩まされていることを理由に、今後は自律型AIエージェントやバイブコーディングによるプルリクエストを受け付けないという判断を下しました。<p><b><a href=\"https://gigazine.net/news/20260702&#45;godot&#45;ban&#45;ai/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-godot-ban-ai/",
+      "lang": "ja"
+    },
+    {
+      "title": "Belkinの「Nintendo Switch 2用USB-C to USB-Cケーブル60W」は本当にNintendo Switch 2をより速く充電できるのか？",
+      "summary": "チャンネル登録者数1690万人超の人気ガジェットレビューチャンネルであるLinus Tech Tipsが立ち上げた研究開発ラボ・LTT Labsが、スマートフォン向けの充電機器などで知られるBelkinが販売している「Nintendo Switch 2用USB-C to USB-Cケーブル60W」は、本当にNintendo Switch 2を急速充電できるのか調査しています。<p><b><a href=\"https://gigazine.net/news/20260702&#45;belkin&#45;cable&#45;charge&#45;nintendo&#45;switch&#45;2&#45;faster/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-belkin-cable-charge-nintendo-switch-2-faster/",
+      "lang": "ja"
+    },
+    {
+      "title": "2026年7月2日のヘッドラインニュース",
+      "summary": "ケンタッキーフライドチキンで、2026年7月8日(水)から「レッドホットチキン」と「グリーンホットウィング」が発売されます。「レッドホットチキン」は夏定番の辛口チキン。ハラペーニョの爽やかな香りと辛さがクセになる「グリーンホットチキン」は、手羽元を使用した「グリーンホットウィング」として復活します。<p><b><a href=\"https://gigazine.net/news/20260702&#45;headline/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-headline/",
+      "lang": "ja"
+    },
+    {
+      "title": "「明星 中華三昧カップ 四川飯店 汁なし四川麻辣麺」の麻辣レベルを実食レビュー",
+      "summary": "ピリピリした辛さの「辣」とシビれる辛さの「麻」を楽しめるカップ麺「明星 中華三昧カップ 四川飯店 汁なし四川麻辣麺」が2026年6月29日に登場しました。日本における四川料理の草分け的存在である四川飯店の監修で豆板醤や甜麺醤などの材料を使った本気(マジ)中華に仕上げているとのこと。どんな味がするのか気になったので実際に買って食べてみました。<p><b><a href=\"https://gigazine.net/news/20260702&#45;myojo&#45;shirunasi&#45;shisen&#45;maramen/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-myojo-shirunasi-shisen-maramen/",
+      "lang": "ja"
+    },
+    {
+      "title": "「AliExpressで規制薬物などの販売を防げなかった」として訴えられたアリババが合計6億ドル支払う和解案に合意",
+      "summary": "Alibaba.comやAliExpress.comといったネット通販サイトを運営している中国のビッグテック・アリババ(阿里巴巴)が、加盟店による違法医薬品や規制薬物などのアメリカでの販売・輸入を防止できなかったことで連邦食品・医薬品・化粧品法(FDCA)に違反した一件で、司法省からの申し立てを解決するため、6億ドル(約973億円)を支払う和解案に合意しました。<p><b><a href=\"https://gigazine.net/news/20260702&#45;alibaba&#45;to&#45;pay&#45;600&#45;million&#45;usd/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-alibaba-to-pay-600-million-usd/",
+      "lang": "ja"
+    }
+  ]
+}

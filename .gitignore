@@ -12,3 +12,12 @@ models/*
 # Plecto の開発用自己署名証明書は named volume 側に生成される(certs/ は mountpoint のみ)
 plecto/certs/*
 !plecto/certs/.gitkeep
+
+# eval/ の記事本文(著作権)とサーバログは非コミット。manifest.json と results/ はコミットする
+eval/data/articles/art-*.json
+eval/data/feeditems.json
+eval/results/server-logs/
+
+# Python バイトコード(eval/)— 絶対パスを内包するためコミット禁止
+__pycache__/
+*.pyc

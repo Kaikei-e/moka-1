@@ -1,0 +1,113 @@
+{
+  "week_id": "week-3",
+  "entries": [
+    {
+      "title": "「命名品質特性」 ── 名前の良し悪しを16の性質と8つの効果で評価する",
+      "summary": "「よい命名」「可読性の高い名前」と言っても、様々な観点が存在します。\nこの記事では、命名を決定する上で考慮すべき観点、コードの可読性を上げるために名前が持つべき性質を 命名品質特性 として分類します。ソフトウェア品質特性に倣って、 名前そのものがもつ 16の品質 と、使った結果として現れる 8の効果（利用時の品質）として整理しました。\n全体像は以下の図で示します。\n\n表にすると次のとおり。\nまずは「名前そのものの品質」です。\n\n\n\n分類\n特性\n何を見るか\n\n\n\n\n自立品質\n意味的正確性\n事実・意味と合っているか\n\n\n自立品質\n言語的正確性\n綴り・文法が正しいか\n\n\n自立品質\n明確性\n意図...",
+      "url": "https://zenn.dev/kagan/articles/naming-quality-characteristics",
+      "lang": "ja"
+    },
+    {
+      "title": "Syncthingでサーバー上のフォルダをローカルPCと同期する",
+      "summary": "OpenClawやClaude Code/Codexをサーバーで24時間動かすような使い方をする人が増えてきました。そのようなAIがアシスタントとしてサーバー上動き続ける運用は、便利なのですが、AIが作ったMarkdownやコード、画像などのファイルはサーバー側に置かれます。手元のローカルPCでさっと開いたり、FinderやVS Code、Obsidianで確認したりすることは難しいです。かといって、いちいちSSHやscpを利用するのも煩雑です。\nそのため、以下のような自作ソフトをサーバーに入れてローカルPCからサーバーのファイルにアクセスするような方法も試したのですが、やはりローカルに...",
+      "url": "https://zenn.dev/karaage0703/articles/907b11839dff2d",
+      "lang": "ja"
+    },
+    {
+      "title": "AI時代のチーム開発フローは「小さく安全に流し続ける」こと",
+      "summary": "はじめに\n最近、チームでほぼ毎日リリースできるようになってきました。\nとはいえ、これは開発速度がただ上がったからではありません。変更を小さく保って、安全に流し続けられる状態を地道に作ってきた結果だと思っています。\nAI を使うと実装は速くなります。でも、その分だけ差分が増えるスピードも上がるんですよね。\n小さくリリースできると、もし不具合が出ても影響範囲を小さく抑えられます。原因も追いやすいし、直してまた出すサイクルも早く回せます。\n少人数のうちは、多少大きな差分でも詳しい人が気合いで確認できるかもしれません。でも、メンバーが増えて同時に動く PR やリリースが増えてくると、そのやり...",
+      "url": "https://zenn.dev/nocall/articles/3f0fcbbed6348c",
+      "lang": "ja"
+    },
+    {
+      "title": "非エンジニアがMulmoClaudeで自分専用アプリを作ってみた",
+      "summary": "はじめに\n私は普段、鉄道業界で働いています。需要予測モデルの開発などのデータ分析の仕事をしていますが、非エンジニアになります。そんな私が、MulmoClaudeを触り始めて10日ほどで、自分専用のアプリをいくつか作ることができたので、共有になります。\n!\nMulmoClaudeについて知りたい方は、以下の開発者の中島聡さんの動画や公式レポジトリをご参照ください。\n\nLLMが主役の「自分専用アプリ」MulmoClaude デモ\n誰でも作れる！自分専用データベースアプリ。MulmoClaude\n自分専用のW杯アプリをMulmoClaudeで作ってみた\nMulmoClaude 公式リポジト...",
+      "url": "https://zenn.dev/kusui26/articles/96f7ba8b7efd56",
+      "lang": "ja"
+    },
+    {
+      "title": "AWS Summit Japan 2026 に行ってきた——「実務未経験の私」が、現地で受け取ったもの",
+      "summary": "はじめに\nこんにちは。Honey(@Honey_aws)です。\n2026年6月25日・26日の両日、AWS Summit Japan 2026 に現地参加しました。\n「資格と個人開発のみの私」が、現地で何を受け取ったかを振り返り、自分の記録として残したいと思います。\n今回は記事というより、とっても楽しかったので自分の思い出をゆるく綴っていきたいと思います。\n前回記事「AWS13冠は、何を証明して、何を証明しないのか」の話も少ししていますので、もし良ければ読んでいただけると嬉しいです。\n\n 行く前に抱えていたもの\n正直に言うと、行く前は少し身構えていました。\n私の AWS は、想像の中...",
+      "url": "https://zenn.dev/honey_aws/articles/aws-summit-japan-2026",
+      "lang": "ja"
+    },
+    {
+      "title": "プログラマーのためのブックマーク整理術",
+      "summary": "まえがき\nプログラマーの仕事をしていると、大量のブックマークを作ることになりがちです。\n公式ドキュメント、GitHub、Slack、Backlog、Notion、Figma、管理画面、API仕様書、検証環境、本番環境など、日々アクセスするページはどんどん増えていきます。\n最初はブックマークバーへそのまま登録していても問題ありません。\nしかし、案件が増えるにつれて目的のページを探す時間が増え、生産性も落ちてしまいます。\nこの記事では、私が試行錯誤してたどり着いたブックマーク整理の考え方を紹介します。\n!\nこの記事では文章の校正とフォルダ分けの例示に生成AIを利用しております。\n\n\n\n ...",
+      "url": "https://zenn.dev/k_tabuchi/articles/bef3713e4ffb58",
+      "lang": "ja"
+    },
+    {
+      "title": "影響のあるアプリだけVRTを実行するようにして、CircleCIのクレジットを削減した",
+      "summary": "こんにちは、Social PLUS のフロントエンドエンジニアのまっくすです。\n今回は、CircleCI のコストをきっかけに、普段あまり細かく見る機会のなかった CI のクレジット消費量を調べました。\nプロジェクトやジョブごとの利用状況を確認していくと、Storybook のビルドやスクリーンショット撮影を行うジョブが、フロントエンド全体のクレジット消費量の大きな割合を占めていることが分かりました。\n調査の結果、Storybook のビルドやスクリーンショット撮影を行うジョブが、フロントエンド全体のクレジット消費量の大きな割合を占めていることが分かりました。そこで、VRT の実行方法に...",
+      "url": "https://zenn.dev/socialplus/articles/9368594bc4ce7c",
+      "lang": "ja"
+    },
+    {
+      "title": "Web 標準動向 2026年6月版",
+      "summary": "こんにちは！ サイボウズ株式会社 フロントエンドエンジニアの mehm8128 (@mehm8128) です。\n\n はじめに\nサイボウズは 2025 年 4 月より、W3C のメンバーに加入しました。\nhttps://blog.cybozu.io/entry/joining-w3c\n標準化プロセスに関わることができるようになるための最初の一歩として、フロントエンドエンジニアの一部のメンバーは積極的に Web 標準のキャッチアップを行っています。\nそこで、毎月メンバーが興味を持った Web 標準に関する話題や、実際に標準化プロセスに関わることができた場合にはその報告などを 1 つの記事とし...",
+      "url": "https://zenn.dev/cybozu_frontend/articles/web_standards_trends_202606",
+      "lang": "ja"
+    },
+    {
+      "title": "（2）中学生が作っている自作OS、mochiOS - ケーパビリティなどのお話",
+      "summary": "!\nめっちゃ長いです。時間があるときに読んでくれたら嬉しいです！\n\nみなさんこんにちは。中三のたそです。\n私は、mochiOSというOSを開発しています。\n今の時代、LinuxとかWindows、macOSがあるのにわざわざ新しいOSを作らなくてもいいじゃないか、意味わからん、という声も聞こえてきそうですが、なぜ作っているのかについては前回の記事に書いているので、そちらを読んでみてください。\nmochiOSでは、mnuという自作カーネルを使用しています。\nmnuという名前は「mnu's not unix」の略です。\n開発者は再帰的頭字語を使いがちなイメージがありますが、なぜなのでしょうか...",
+      "url": "https://zenn.dev/nekogakure/articles/60ca06b71029a2",
+      "lang": "ja"
+    },
+    {
+      "title": "動画編集ソフト「AviQtl」の創り方",
+      "summary": "taisho-guyです。AviUtlを踏襲し凌駕することでAviUtlを「仕方なく」使っている方々の最適解になることを目指す動画編集ソフトAviQtlを開発しておりました。5月末で開発を終了し、NeoUtlへ移行しましたから、AviQtlの\n\n技術的な紐解き\nなぜ開発をリセットしたか\n今後の方針\n\nをまとめました。AviQtlの開発は停止しましたが、完成度とコード量が丁度良い（？）為、動画編集ソフトの開発にチャレンジしたい方や動画編集ソフトの仕組みが気になる方にとって良い教材になれると確信しております。\n\n 開発を初めた理由\nAviUtl ExEdit2が出てコミュニティが大きく沸い...",
+      "url": "https://zenn.dev/taisho_guy/articles/2fa8e91a6c0a07",
+      "lang": "ja"
+    },
+    {
+      "title": "連動するフォームを TanStack Form で書く",
+      "summary": "こんにちは。e-dash でフロントエンドエンジニアをしている前田です。\n昨年12月に React Hook Form についての記事を書きましたが、やはり複雑なフォームの設計は難しいですね。\nReact Hook Form は、非制御コンポーネントをベースに余計な再レンダリングを抑えつつ、Zod などのスキーマと組み合わせて型安全にフォームを構築できる素晴らしいライブラリです。\n一方で、各フィールドがリアクティブに変化するようなフォームでは、setValue・trigger・ref といった命令的な記述が増えてしまう点に課題を感じていました。\n私は最近、TanStack Form を使...",
+      "url": "https://zenn.dev/edash_tech_blog/articles/29679afbb3e8da",
+      "lang": "ja"
+    },
+    {
+      "title": "Cloudflare、AIボットによるコンテンツ利用の用途別制御機能と、エージェントによるWebリソース利用への課金基盤を発表 ——Content Independence Dayから1年",
+      "summary": "Cloudflareは2026年7月1日、AIボットによるWebコンテンツ利用を用途別に制御し、AI検索での利用やエージェントによるWebページ・APIの呼び出しに対価を設定できるようにする新機能や取り組みを発表した。",
+      "url": "https://gihyo.jp/article/2026/07/content-independence-day-one-year-on?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "U-22プログラミング・コンテスト2026 応募受付開始",
+      "summary": "U-22プログラミング・コンテスト2026の応募受付が2026年7月1日に開始された。締切は8月31日。",
+      "url": "https://gihyo.jp/article/2026/07/u22procon-2026-entry?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "Microsoft Research、エージェントスキルを最適化するSkillOptを紹介",
+      "summary": "Microsoft Researchは6月30日、AIエージェントに追加の作業手順や判断基準を与えるMarkdown形式のエージェントスキル（SKILL.md）を、実行結果に基づいて改善する手法「SkillOpt」を公式ブログで紹介した。",
+      "url": "https://gihyo.jp/article/2026/07/msftr-released-skillopt?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "Safariのプレビュー版に開発者向けMCPサーバーの機能が追加",
+      "summary": "2026年7月1日にリリースされたWebブラウザSafariのTechnology Preview 247にWeb開発者向けMCPサーバーが導入された。",
+      "url": "https://gihyo.jp/article/2026/07/safari-mcp-server?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "開発プロセスに組み込む継続的なセキュリティ対策 ～ヒアリングの標準化からAI活用、PoCによる現場定着まで",
+      "summary": "『Software Design 2026年7月号』の第1特集「セキュリティバイデザイン入門」から第4章「開発プロセスに組み込む継続的なセキュリティ対策」を公開します。",
+      "url": "https://gihyo.jp/article/2026/07/continuous-security?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "画面のないFitbit Airを1ヵ月使って見えた「引き算」の価値",
+      "summary": "ディスプレイを完全に排除し、「通知疲れ」や「デジタルデトックス」への答えとして登場した「Fitbit Air」。今回は、この画面を持たないこのミニマルなウェアラブルを1ヵ月使い込だ印象をまとめておきます。",
+      "url": "https://gihyo.jp/article/2026/07/android-weekly-topics-260702?utm_source=feed",
+      "lang": "ja"
+    },
+    {
+      "title": "Google、NotebookLMに約60秒の縦型ショート動画「Short Video Overviews」を追加、英語でWeb版全ユーザーに展開",
+      "summary": "GoogleのNotebookLM公式Xアカウントは2026年6月30日、NotebookLMの新機能「Short Video Overviews」を発表した。",
+      "url": "https://gihyo.jp/article/2026/07/notebooklm-short-video-overview?utm_source=feed",
+      "lang": "ja"
+    }
+  ]
+}

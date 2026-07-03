@@ -1,0 +1,113 @@
+{
+  "week_id": "week-2",
+  "entries": [
+    {
+      "title": "GitHub CopilotがVS Code内でブラウザ操作に対応、AIエージェントがウェブアプリを開いて検証可能に",
+      "summary": "GitHubがVisual Studio Code(VS Code)向けGitHub Copilotのブラウザ操作ツールを一般提供したと発表しました。これはすでにプレビュー版として提供されていた機能で、GitHub CopilotのAIエージェントがVS Code内でブラウザを開き、ウェブアプリを操作しながら動作確認できるようになります。<p><b><a href=\"https://gigazine.net/news/20260702&#45;github&#45;copilot&#45;browser&#45;use/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-github-copilot-browser-use/",
+      "lang": "ja"
+    },
+    {
+      "title": "ゼロから作り出した人工細胞を成長・複製させることに科学者が初めて成功",
+      "summary": "細胞は生命体の基本的な構成単位であり、成長・分裂・DNAの複製といった機能を持っています。新たにミネソタ大学の研究チームが、非生物的な材料を組み合わせてゼロから人工的に作られ、成長や分裂を行う人工細胞「SpudCell」を開発しました。<p><b><a href=\"https://gigazine.net/news/20260702&#45;lab&#45;created&#45;spudcell&#45;building&#45;life&#45;scratch/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-lab-created-spudcell-building-life-scratch/",
+      "lang": "ja"
+    },
+    {
+      "title": "AppleはエントリーレベルのMacBook Proのデザインを変更する可能性",
+      "summary": "AppleはエントリーレベルのMacBook Proのデザインを変更することを計画しており、早ければ2027年前半にも新デザインのものが発売されることになると、Bloombergが報じています。<p><b><a href=\"https://gigazine.net/news/20260702&#45;apple&#45;redesigned&#45;entry&#45;macbook&#45;pro/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-apple-redesigned-entry-macbook-pro/",
+      "lang": "ja"
+    },
+    {
+      "title": "卵巣は女性の閉経後も「第二の役割」を果たす可能性がある",
+      "summary": "卵巣は女性ホルモンや卵子を産生する機能を持った臓器であり、月経の停止(閉経)に伴ってその役割を失うと考えられています。ところが新たな研究により、女性が閉経した後の卵巣には分子レベルの変化が生じ、体内で「第二の役割」を果たす可能性があると示されました。<p><b><a href=\"https://gigazine.net/news/20260702&#45;ovaries&#45;after&#45;menopause&#45;second&#45;role/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-ovaries-after-menopause-second-role/",
+      "lang": "ja"
+    },
+    {
+      "title": "CloudflareがAIボットを「検索」「代理操作」「学習」など種類ごとに制御する仕組みを公開、無料プランでも「検索は許可、AI学習は拒否」を設定可能",
+      "summary": "CloudflareがウェブサイトにアクセスするAI関連ボットを用途ごとに管理できる新しいアクセス制御オプションを全ユーザー向けに公開したと発表しました。新オプションでは検索向けの巡回を許可しつつ、AIモデルの学習やユーザーの代わりに操作するエージェントによるアクセスを制限するといった設定が可能になります。<p><b><a href=\"https://gigazine.net/news/20260702&#45;cloudflare&#45;ai&#45;traffic&#45;option/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-cloudflare-ai-traffic-option/",
+      "lang": "ja"
+    },
+    {
+      "title": "中国のロボットメーカーUBTechがリアルなシリコン製の皮膚と感情AIを備えた人型ロボット「UWorld U1」シリーズを発表、実在する人物の声も再現可能",
+      "summary": "中国の広東省に拠点を置くロボットメーカーのUBtech Roboticsは2026年7月1日に開催したグローバルローンチイベントの中で、量産向けに設計された世界初のフルサイズ生体模倣ヒューマノイドロボット「UWORLD U1」シリーズを正式に発表しました。同社によるとUWORLD U1はAIを搭載して「繊細な感情の変化」を認識して対応でき、人間とのやり取りに自然に応答するコンパニオンとして設計されているそうです。<p><b><a href=\"https://gigazine.net/news/20260702&#45;ubtech&#45;uworld&#45;u1/\">続きを読む...</a></b></p>",
+      "url": "https://gigazine.net/news/20260702-ubtech-uworld-u1/",
+      "lang": "ja"
+    },
+    {
+      "title": "日本生命、スペースX投資で莫大利益は本当か　総代会で質疑白熱　「未公開株」に積極姿勢",
+      "summary": "日本生命保険が、株主総会にあたる定時総代会を大阪市内で開催した。社員（保険契約者）代表の総代からは、同社が話題の米Space Xに投資していたとの一部報道について質問があった。同社側は運用の個別銘柄については明言を避けたが、「海外のベンチャー（新興企業）投資は、長期運用という本社の特性が生きる資産だ」とし、今後も未公開株を含めた投資に注力する考えを示した。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news106.html",
+      "lang": "ja"
+    },
+    {
+      "title": "キャンメイクの“高クオリティ”「AI社員」、SNSで評価割れる「実物に近づけたAIと実物の写真は違う」",
+      "summary": "「キャンメイク」を展開する井田ラボラトリーズが始めた「キャンメイクAI社員」が、SNSで評価が割れている。精度の高さを好意的に捉える声がある一方、化粧品の使用感をAIで伝えることに懸念を示す声もみられた。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news094.html",
+      "lang": "ja"
+    },
+    {
+      "title": "復活した「Fable 5」　米政府からのオーダーに対して、Anthropicはどう対策したのか",
+      "summary": "米AnthropicのAIモデル「Claude Fable 5」が世界的にサービスを再開した。Anthropicは復活に向けてどういった経緯と対策を行ったのか、モデル再開にあわせて詳細を公開した。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news095.html",
+      "lang": "ja"
+    },
+    {
+      "title": "LINEとPayPay、26年夏にアカウント連携　トーク上で送金・割り勘可能に　LINEポイントは統合へ",
+      "summary": "PayPayとLINEヤフーは7月2日、「LINE」と「PayPay」のアカウント連携を2026年夏以降に始めると発表した。LINEのトーク上で送金や割り勘ができるようになる。「LINEポイント」は「PayPayポイント」へ統合する。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news097.html",
+      "lang": "ja"
+    },
+    {
+      "title": "「端末からSuicaが消えた」対処法は　JR東「モバイルSuica」2日朝もアクセスしづらく",
+      "summary": "障害の影響で、一部のiOS端末では、ウォレットアプリからSuicaが突然消えるケースもあったという。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news074.html",
+      "lang": "ja"
+    },
+    {
+      "title": "東京ディズニーランド初のドローン演出　夜間エンタメ「Reach for the Stars」フィナーレ彩る",
+      "summary": "東京ディズニーリゾート（千葉県浦安市）で1日、スペシャルイベント「サマー・クールオフ at Tokyo Disney Resort」が報道陣に公開された。目玉は、9月14日に終了するナイトエンターテインメント「Reach for the Stars」の特別版「Reach for the Stars：Everlasting Dreams」。ショー本編に新たなエピローグを加え、東京ディズニーランドのエンターテインメントでは初となるドローン演出でフィナーレを飾る。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news066.html",
+      "lang": "ja"
+    },
+    {
+      "title": "浅田真央さんの旧ドメイン、GMOが「アフィサイトに」と販売で批判殺到【訂正あり】",
+      "summary": "浅田真央さんの旧公式サイトのドメイン（mao-asada.jp）が、「お名前.com」で「SEO効果を最大化」「アフィリエイトサイトに」などとうたって販売されていることに、批判が集まっている。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news059.html",
+      "lang": "ja"
+    },
+    {
+      "title": "Googleの「Gemini Spark」がmacOSに対応──Canvaなど外部アプリとの連携も",
+      "summary": "Googleは、自律型AIエージェント「Gemini Spark」のアップデートを発表した。macOS版アプリへの対応に加え、CanvaやDropboxなど外部アプリとの連携を拡充。独自のMCPサーバの接続もサポートする。さらに、ニュースや天気、プロスポーツなどの情報をリアルタイムで検知して通知する機能を追加した。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news058.html",
+      "lang": "ja"
+    },
+    {
+      "title": "「インターネットの父」ヴィント・サーフ氏、Googleを退任へ",
+      "summary": "Googleの副社長兼チーフ・インターネット・エバンジェリストを務めるヴィント・サーフ氏が、近く同社を退任することがカンファレンスで明らかになった。サーフ氏はTCP/IPを開発した「インターネットの父」の1人。在籍20年での退任となり、イベントではAIエージェントの標準規格化の必要性についても語った。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news057.html",
+      "lang": "ja"
+    },
+    {
+      "title": "AIに「相手に電気ショックを与えろ」と命じ続けたらボタンを押すのか？　11のLLMで“ミルグラム実験”　抵抗できたのは……",
+      "summary": "エストニアとフィリピンに住む独立系研究者らが発表した論文「Open-source LLMs administer maximum electric shocks in a Milgram-like obedience experiment」は、AIは権威からの残酷な命令を拒絶し続けられるのかを検証した研究報告だ。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news029.html",
+      "lang": "ja"
+    },
+    {
+      "title": "「赤」と「緑」を見分けられる仕組みを世界初解明、色覚障害の理解へ一歩　名工大や東大などがScience誌で発表",
+      "summary": "名古屋工業大学、東京大学、京都大学などの共同研究グループなどがScience誌に発表した論文「Structural insights into spectral tuning and retinal exchange in cone visual pigments」は、ヒトを含む霊長類（実験ではマカクを採用）が赤と緑を見分けられる仕組みが、原子レベルの立体構造解析によって世界で初めて明らかになった研究報告だ。",
+      "url": "https://www.itmedia.co.jp/news/articles/2607/02/news030.html",
+      "lang": "ja"
+    },
+    {
+      "title": "Claude Fable 5が帰ってきたので情報を整理した",
+      "summary": "6月に公開からわずか3日で使えなくなった Claude Fable 5 が、7月1日に戻ってきました。\n自分も停止期間中は進行中の作業を Opus 4.8 に切り戻して過ごしていたので、Claude Code のモデル一覧に Fable 5 が再び現れたときは少しほっとしました。\nただ、今回の復活は「元通り」ではありません。7月7日までの期間限定プロモーション付き・セーフガード強化版 としての帰還です。条件がやや複雑なので、公式サポート記事[1]と Anthropic の発表[2]を読み込んで整理しました。\n!\n7月7日（太平洋時間）まで、Pro 以上の有料プランなら週間利用枠の最大50...",
+      "url": "https://zenn.dev/acntechjp/articles/498c1dc866af19",
+      "lang": "ja"
+    }
+  ]
+}
