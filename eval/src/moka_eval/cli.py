@@ -5,6 +5,7 @@ import contextlib
 import json
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 from moka_eval import bench, dataset, embed, generate, judge, report
 from moka_eval.client import LlamaClient
@@ -169,7 +170,8 @@ def cmd_generate(args: argparse.Namespace) -> int:
     task: str = args.task
     run_id: str = args.run_id
     seeds: list[int] = [int(s) for s in args.seeds.split(",")]
-    template, prompt_sha = generate.load_prompt(task)
+    prompt_override = Path(args.prompt) if args.prompt else None
+    template, prompt_sha = generate.load_prompt(task, prompt_override)
     if task == "recap":
         items: list[tuple[str, str]] = [
             (w.week_id, generate.render_recap_prompt(template, w))
@@ -192,12 +194,13 @@ def cmd_generate(args: argparse.Namespace) -> int:
             run_id,
             {
                 "run_id": run_id,
-                "model_key": spec.key,
+                "model_key": args.label or spec.key,
                 "model_hf": spec.hf,
                 "task": task,
                 "llamacpp_build": LLAMACPP_BUILD,
                 "seeds": seeds,
                 "prompt_sha256": prompt_sha,
+                "prompt_path": str(prompt_override) if prompt_override else f"{task}_ja.txt",
                 "n_items": len(items),
                 "load_time_s": round(handle.load_time_s, 1),
                 "started_at": _now_iso(),
@@ -221,6 +224,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
                         max_tokens=max_tokens,
                         server_flags=server_flags,
                         json_schema=schema,
+                        model_key=args.label,
                     )
                     generate.append_record(run_id, record)
                     done += 1
@@ -361,6 +365,16 @@ def main() -> int:
     p.add_argument("--run-id", required=True)
     p.add_argument("--seeds", default="42")
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument(
+        "--prompt",
+        default=None,
+        help="prompts/{task}_ja.txt を差し替えるプロンプトA/B比較用ファイルパス",
+    )
+    p.add_argument(
+        "--label",
+        default=None,
+        help="出力レコードの model_key を上書き(同一モデルのプロンプトA/B比較で区別するため)",
+    )
     p.set_defaults(func=cmd_generate)
 
     p = sub.add_parser("pairs")

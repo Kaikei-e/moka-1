@@ -29,9 +29,9 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def load_prompt(task: str) -> tuple[str, str]:
-    """(テンプレート, sha256) を返す."""
-    path = PROMPTS_DIR / f"{task}_ja.txt"
+def load_prompt(task: str, override_path: Path | None = None) -> tuple[str, str]:
+    """(テンプレート, sha256) を返す。override_path はプロンプトA/B比較用の差し替え."""
+    path = override_path or PROMPTS_DIR / f"{task}_ja.txt"
     if not path.is_file():
         msg = f"prompt template missing: {path}"
         raise GenerateError(msg)
@@ -74,6 +74,7 @@ def generate_one(
     max_tokens: int,
     server_flags: Sequence[str],
     json_schema: dict[str, Any] | None = None,
+    model_key: str | None = None,
 ) -> GenerationRecord:
     result = client.chat(
         prompt,
@@ -98,7 +99,7 @@ def generate_one(
     effective = answer_tokens / (result.total_ms / 1000.0) if result.total_ms > 0 else 0.0
     return GenerationRecord(
         run_id=run_id,
-        model_key=spec.key,
+        model_key=model_key or spec.key,
         model_hf=spec.hf,
         llamacpp_build=LLAMACPP_BUILD,
         task=task,
