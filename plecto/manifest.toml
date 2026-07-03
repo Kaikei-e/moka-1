@@ -1,8 +1,13 @@
 # moka-1 エッジ manifest — Plecto ドッグフーディング Phase 1(tenets §3.5)
 # TLS 終端 + path ルーティングのみの素通し。WASM フィルタ(認証・レート制限)は Phase 2 から。
 # パスはすべて manifest 相対。コンテナ内では ./plecto が /run/plecto に ro マウントされ、
-# certs/ だけ named volume が上書きされる(entrypoint.sh が生成)。
+# certs/ だけ named volume が上書きされる(plecto-certs-init が生成、compose.yaml 参照)。
 # 編集後は `docker compose kill -s HUP plecto` でゼロダウンタイム反映(壊れた編集は fail-closed で無視される)。
+
+# データプレーンの bind アドレス。CLI 引数を廃し manifest を単一ソースにする
+# (Plecto field report §3.2 で解決 — 公式イメージは CMD にこのファイルのパスしか渡さない)
+[listen]
+addr = "0.0.0.0:443"
 
 [observability]
 # /metrics /healthz /readyz — compose 側で 127.0.0.1 のみに公開

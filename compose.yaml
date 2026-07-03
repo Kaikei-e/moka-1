@@ -1,13 +1,46 @@
 # moka-1 — `docker compose up -d --wait` 一発で全部が上がる(tenets §2-1)
 # 常駐サービス = 5: plecto / moka-core / moka-web / db / llm(tenets §2-3)
-# migrate は one-shot ジョブ(ADR00001)で常駐上限には数えない
+# migrate と plecto-certs-init は one-shot ジョブ(ADR00001)で常駐上限には数えない
 name: moka
 
 services:
+  # 開発用 TLS 証明書を named volume に生成する one-shot ジョブ(ADR見直し版)。
+  # 公式 Plecto イメージは distroless(シェル/openssl 無し)なので、以前の entrypoint.sh 方式
+  # (コンテナ起動時に自己署名生成)がそのままでは動かず、migrate と同じ「別コンテナで先に済ませる」
+  # 形に切り出した。生成済みならスキップ(冪等)。本物の証明書に差し替える場合は同じ named volume の
+  # 同じパス(certs/moka.crt, certs/moka.key)に置けばこのジョブは何もしない。
+  # chown は毎回実行する(存在チェックで早期 return しても所有権だけは合わせる) — plecto コンテナは
+  # distroless nonroot(uid 65532)で読むので、root で生成したファイルのままだと Permission denied
+  plecto-certs-init:
+    image: alpine:3.22
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -s /certs/moka.crt ] && [ -s /certs/moka.key ]; then
+          echo "plecto dev certificate already present, skipping generation" >&2
+        else
+          apk add --no-cache openssl >/dev/null
+          echo "generating self-signed dev certificate in /certs" >&2
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /certs/moka.key -out /certs/moka.crt \
+            -days 825 -subj "/CN=moka.localhost" \
+            -addext "subjectAltName=DNS:moka.localhost,DNS:localhost,IP:127.0.0.1"
+        fi
+        chown 65532:65532 /certs/moka.crt /certs/moka.key
+        chmod 0644 /certs/moka.crt
+        chmod 0600 /certs/moka.key
+    volumes:
+      - plecto-certs:/certs
+    restart: "no"
+
   # エッジ: TLS 終端、HTTP/1·2·3、ルーティング。Phase 1 は素通し(plecto/manifest.toml)。
-  # upstream が落ちていても 503 で立ち続けるので depends_on は張らない(エッジは独立)。
+  # upstream が落ちていても 503 で立ち続けるので upstream への depends_on は張らない(エッジは独立)。
+  # 公式イメージ(ghcr.io/kaikei-e/plecto)固定 — ADR00005 の Revisit Trigger(公式イメージ配布)
+  # が発火したためソースビルドから移行。タグは可変なので digest も併記して pin する。
   plecto:
-    build: ./plecto
+    image: ghcr.io/kaikei-e/plecto:0.1.0@sha256:71252ce6061099d2e41681dae14e098183030caa109416d37787b6890e38bca6
+    command: ["/run/plecto/manifest.toml"] # bind アドレスは manifest の [listen] 側(CLI引数は渡さない)
     restart: unless-stopped
     ports:
       - "443:443/tcp" # HTTP/1.1 + HTTP/2 (TLS)
@@ -15,12 +48,13 @@ services:
       - "127.0.0.1:9099:9099" # admin (/metrics /healthz /readyz) — ホストローカルのみ
     volumes:
       - ./plecto:/run/plecto:ro # manifest.toml(+ Phase 2 以降の filters/)
-      - plecto-certs:/run/plecto/certs # 自己署名証明書(entrypoint.sh が初回生成)
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:9099/readyz"]
-      interval: 30s
-      start_period: 30s
-      start_interval: 2s
+      - plecto-certs:/run/plecto/certs # 自己署名証明書(plecto-certs-init が生成)
+    depends_on:
+      plecto-certs-init:
+        condition: service_completed_successfully
+    # healthcheck 無し: 公式イメージは distroless で curl もシェルも無く、plecto CLI にも
+    # moka-core の `moka healthz` に相当する自己プローブ用サブコマンドが無い(validate/schema/
+    # --version のみ)。Plecto 側に issue 起票予定。手動確認は README の運用コマンド参照
 
   # API + 常駐エージェントループ(Go 単一バイナリ)
   moka-core:
