@@ -34,11 +34,29 @@ func TestNewMux(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "api stub returns 501",
+			name:       "api stub returns 501 for unimplemented paths",
 			method:     http.MethodGet,
-			path:       "/api/feeds",
+			path:       "/api/nope",
 			wantStatus: http.StatusNotImplemented,
-			wantBody:   map[string]string{"error": "not implemented yet", "path": "/api/feeds"},
+			wantBody:   map[string]string{"error": "not implemented yet", "path": "/api/nope"},
+		},
+		{
+			name:       "feeds rejects DELETE",
+			method:     http.MethodDelete,
+			path:       "/api/v1/feeds",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "article by id rejects POST",
+			method:     http.MethodPost,
+			path:       "/api/v1/articles/7",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "articles rejects POST",
+			method:     http.MethodPost,
+			path:       "/api/v1/articles",
+			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "unknown path returns 404",
@@ -48,7 +66,7 @@ func TestNewMux(t *testing.T) {
 		},
 	}
 
-	mux := NewMux()
+	mux := NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

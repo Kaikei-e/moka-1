@@ -7,13 +7,31 @@ import (
 	"net/http"
 )
 
-// NewMux は moka-core の全ルートを配線した mux を返す。
-// M0 スケルトン: /healthz と /api/ プレースホルダのみ。
-func NewMux() *http.ServeMux {
+// NewMux は moka-core の全ルートを配線した mux を返す。依存は消費側ポートで受け、
+// 具象は cmd/moka/main.go(composition root)が注入する。
+// API はバージョニングする(/api/v1/)。より specific なパターンが /api/ スタブに勝つ。
+func NewMux(
+	feeds FeedRegistrar,
+	feedList FeedLister,
+	articles ArticleLister,
+	article ArticleGetter,
+) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
+	mux.HandleFunc("POST /api/v1/feeds", handleRegisterFeed(feeds))
+	mux.HandleFunc("GET /api/v1/feeds", handleListFeeds(feedList))
+	mux.HandleFunc("GET /api/v1/articles", handleListArticles(articles))
+	mux.HandleFunc("GET /api/v1/articles/{id}", handleGetArticle(article))
+	// メソッド無しパターンはメソッド不一致時の受け皿(無いと /api/ スタブが 501 で拾ってしまう)
+	mux.HandleFunc("/api/v1/feeds", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/articles", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/articles/{id}", handleMethodNotAllowed)
 	mux.HandleFunc("/api/", handleAPIStub)
 	return mux
+}
+
+func handleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
+	writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 }
 
 func handleHealthz(w http.ResponseWriter, _ *http.Request) {
@@ -27,6 +45,10 @@ func handleAPIStub(w http.ResponseWriter, r *http.Request) {
 		"error": "not implemented yet",
 		"path":  r.URL.Path,
 	})
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

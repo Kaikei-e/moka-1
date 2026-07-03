@@ -1,0 +1,68 @@
+# E2E 専用オーバーレイ — 本番の compose.yaml に e2e 関連を含めない(分離が正)。
+# 使い方: docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait moka-core e2e-fixtures
+# e2e-fixtures / e2e-db / e2e-migrate はこのファイルでしか定義されないので、通常の
+# `docker compose up -d` では存在すらしない = 常駐サービス 5 上限(tenets §2-3)の勘定外
+services:
+  moka-core:
+    ports:
+      - "127.0.0.1:8080:8080" # hurl がホストから叩くため(e2e 実行時のみ公開)
+    environment:
+      # fixture は docker ネットワーク内 = プライベート IP なので SSRF ガードを緩和(e2e 限定)
+      MOKA_FEED_ALLOW_PRIVATE: "true"
+      # 本番 db-data とは別のボリュームに書く(e2e の登録シナリオが本番データを汚さない)
+      DATABASE_URL: postgres://moka@e2e-db:5432/moka?sslmode=disable
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+      e2e-migrate:
+        condition: service_completed_successfully
+
+  # Playwright がホストから叩くため(e2e 実行時のみ公開)。本番は Plecto 経由のみ
+  moka-web:
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      ORIGIN: http://localhost:3000 # form actions の origin 検査をホスト直叩きに合わせる
+
+  # 決定的フィードの静的配信。nginx は ETag/Last-Modified を自動付与するので
+  # 再登録シナリオが条件付き GET(304)経路を実際に通る
+  e2e-fixtures:
+    image: nginx:1.29-alpine
+    volumes:
+      - ./e2e/fixtures:/usr/share/nginx/html:ro
+
+  # e2e 専用 DB。本番 db-data ボリュームとは独立しているので、E2E の登録シナリオが
+  # 本番の購読データを書き換えたり残留させたりしない(down -v で本番データを巻き込む事故の防止)
+  e2e-db:
+    image: pgvector/pgvector:0.8.4-pg18-trixie
+    environment:
+      POSTGRES_USER: moka
+      POSTGRES_DB: moka
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - e2e-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moka -d moka"]
+      interval: 10s
+      start_period: 30s
+      start_interval: 2s
+
+  # one-shot: e2e-db への Atlas マイグレーション適用(本番の migrate ジョブとは別系統)
+  e2e-migrate:
+    image: arigaio/atlas:1.2.3-community-alpine
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'atlas migrate apply --url "postgres://moka:$$(cat /run/secrets/postgres_password)@e2e-db:5432/moka?sslmode=disable" --dir file:///migrations'
+    secrets:
+      - postgres_password
+    volumes:
+      - ./db/migrations:/migrations:ro
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  e2e-db-data:

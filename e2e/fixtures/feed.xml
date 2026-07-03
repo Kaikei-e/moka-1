@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E 固定フィクスチャ。guid / pubDate は決定的アサーションのため固定 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Deterministic feed for moka-core e2e tests</description>
+    <item>
+      <title>First article</title>
+      <link>http://e2e-fixtures/articles/1</link>
+      <guid isPermaLink="false">urn:moka-e2e:1</guid>
+      <pubDate>Mon, 29 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of the first fixture article.</description>
+    </item>
+    <item>
+      <title>Second article</title>
+      <link>http://e2e-fixtures/articles/2</link>
+      <guid isPermaLink="false">urn:moka-e2e:2</guid>
+      <pubDate>Tue, 30 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of the second fixture article.</description>
+    </item>
+    <item>
+      <title>Third article</title>
+      <link>http://e2e-fixtures/articles/3</link>
+      <guid isPermaLink="false">urn:moka-e2e:3</guid>
+      <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Body of the third fixture article.</description>
+    </item>
+  </channel>
+</rss>

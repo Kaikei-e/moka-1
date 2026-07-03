@@ -9,12 +9,15 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"syscall"
 	"time"
 
 	"os/signal"
 
+	"github.com/Kaikei-e/moka-1/core/internal/feed"
 	"github.com/Kaikei-e/moka-1/core/internal/httpapi"
+	"github.com/Kaikei-e/moka-1/core/internal/store"
 )
 
 const listenAddr = ":8080"
@@ -38,9 +41,21 @@ func main() {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
+	// 合成の根(composition root): 具象同士の結線はここだけ(clean-architecture)
+	pool, err := store.NewPool(ctx, os.Getenv("DATABASE_URL"), os.Getenv("POSTGRES_PASSWORD_FILE"))
+	if err != nil {
+		return fmt.Errorf("init db pool: %w", err)
+	}
+	defer pool.Close()
+
+	st := store.New(pool)
+	allowPrivate, _ := strconv.ParseBool(os.Getenv("MOKA_FEED_ALLOW_PRIVATE"))
+	validator := feed.NewURLValidator(allowPrivate)
+	registrar := feed.NewRegistrar(st, feed.NewHTTPFetcher(validator), validator, logger)
+
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           httpapi.NewMux(),
+		Handler:           httpapi.NewMux(registrar, st, st, st),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -83,7 +98,7 @@ func healthz() int {
 	if err != nil {
 		return 1
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return 1
 	}

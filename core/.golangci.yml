@@ -1,0 +1,18 @@
+# golangci-lint v2(bp-go: プリセット依存でなく明示的に有効化)
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - revive
+    - testifylint
+    - thelper
+    - paralleltest
+    - sloglint
+    - bodyclose
+    - noctx
+    - errorlint
+    - copyloopvar

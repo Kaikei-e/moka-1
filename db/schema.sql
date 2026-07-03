@@ -35,7 +35,8 @@ CREATE TABLE articles (
     UNIQUE (feed_id, guid)
 );
 
-CREATE INDEX articles_published_at_idx ON articles (published_at DESC);
+-- 記事一覧の keyset ページング用。並びキー (published_at DESC NULLS LAST, id DESC) と完全一致させる
+CREATE INDEX articles_published_at_idx ON articles (published_at DESC NULLS LAST, id DESC);
 
 -- タグ(正規化)。LLM 抽出結果の語彙
 CREATE TABLE tags (
@@ -108,6 +109,16 @@ CREATE INDEX article_embeddings_latest_idx ON article_embeddings (article_id, cr
 -- 類似検索(cosine — eval/ の retrieval 評価と同一距離)
 CREATE INDEX article_embeddings_hnsw_idx ON article_embeddings
     USING hnsw (embedding vector_cosine_ops);
+
+-- 全文取り寄せの成果(INSERT-only)。冪等 — 既にあれば再取得しない(article_id ごとの最新が有効)
+CREATE TABLE article_fulltexts (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    article_id BIGINT NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
+    text       TEXT NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX article_fulltexts_latest_idx ON article_fulltexts (article_id, fetched_at DESC);
 
 -- 既読の事実。未読 = 行が無い
 CREATE TABLE article_reads (

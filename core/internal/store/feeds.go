@@ -1,0 +1,114 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/Kaikei-e/moka-1/core/internal/feed"
+)
+
+// イミュータブルデータモデル(ADR00001): UPDATE 文は書かない。
+// feed_fetches は INSERT-only イベント、条件付き GET の状態は最新行から導出する。
+
+// FeedByURL は URL でフィードを引く。無ければ found=false(エラーではない)。
+func (s *Store) FeedByURL(ctx context.Context, url string) (feed.Feed, bool, error) {
+	var f feed.Feed
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, url, COALESCE(title, ''), created_at FROM feeds WHERE url = $1`,
+		url,
+	).Scan(&f.ID, &f.URL, &f.Title, &f.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return feed.Feed{}, false, nil
+	}
+	if err != nil {
+		return feed.Feed{}, false, fmt.Errorf("select feed by url: %w", err)
+	}
+	return f, true, nil
+}
+
+// InsertFeed はフィードを登録する。title は INSERT 時に一度だけ設定(以後 UPDATE しない)。
+// 同時登録の競合(ON CONFLICT DO NOTHING で行が返らない)は既存行の読み直しで解決する。
+func (s *Store) InsertFeed(ctx context.Context, url, title string) (feed.Feed, error) {
+	var f feed.Feed
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO feeds (url, title) VALUES ($1, NULLIF($2, ''))
+		 ON CONFLICT (url) DO NOTHING
+		 RETURNING id, url, COALESCE(title, ''), created_at`,
+		url, title,
+	).Scan(&f.ID, &f.URL, &f.Title, &f.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		existing, found, lookErr := s.FeedByURL(ctx, url)
+		if lookErr != nil {
+			return feed.Feed{}, fmt.Errorf("insert feed conflict lookup: %w", lookErr)
+		}
+		if !found {
+			return feed.Feed{}, fmt.Errorf("insert feed %s: conflict but row not found", url)
+		}
+		return existing, nil
+	}
+	if err != nil {
+		return feed.Feed{}, fmt.Errorf("insert feed: %w", err)
+	}
+	return f, nil
+}
+
+// LatestFetchConditional は最新 feed_fetches 行から条件付き GET の状態を導出する。
+// 取得履歴が無ければゼロ値(条件無し取得)。
+func (s *Store) LatestFetchConditional(ctx context.Context, feedID int64) (feed.Conditional, error) {
+	var c feed.Conditional
+	err := s.pool.QueryRow(ctx,
+		`SELECT COALESCE(etag, ''), COALESCE(last_modified, '')
+		 FROM feed_fetches WHERE feed_id = $1
+		 ORDER BY fetched_at DESC LIMIT 1`,
+		feedID,
+	).Scan(&c.ETag, &c.LastModified)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return feed.Conditional{}, nil
+	}
+	if err != nil {
+		return feed.Conditional{}, fmt.Errorf("select latest fetch: %w", err)
+	}
+	return c, nil
+}
+
+// InsertFeedFetch は取得イベントを追記する(成功・304・失敗すべて)。
+func (s *Store) InsertFeedFetch(ctx context.Context, feedID int64, rec feed.FetchRecord) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO feed_fetches (feed_id, status_code, etag, last_modified, error)
+		 VALUES ($1, NULLIF($2, 0), NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''))`,
+		feedID, rec.StatusCode, rec.ETag, rec.LastModified, rec.Error,
+	)
+	if err != nil {
+		return fmt.Errorf("insert feed fetch: %w", err)
+	}
+	return nil
+}
+
+// ListFeeds は登録済みフィードを新しい順に返す(httpapi.FeedLister)。
+func (s *Store) ListFeeds(ctx context.Context) ([]feed.Feed, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, url, COALESCE(title, ''), created_at
+		 FROM feeds
+		 ORDER BY created_at DESC, id DESC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("select feeds: %w", err)
+	}
+	defer rows.Close()
+
+	var out []feed.Feed
+	for rows.Next() {
+		var f feed.Feed
+		if err := rows.Scan(&f.ID, &f.URL, &f.Title, &f.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan feed: %w", err)
+		}
+		out = append(out, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate feeds: %w", err)
+	}
+	return out, nil
+}
