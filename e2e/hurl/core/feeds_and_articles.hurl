@@ -151,3 +151,26 @@ POST {{host}}/api/v1/articles/not-a-number/summary
 HTTP 400
 [Asserts]
 jsonpath "$.error" exists
+
+# 18. ストリーミング要約(専用エンドポイント)— 直前のステップで既に要約済みなので
+# 新規生成せず(llm を再度叩かない)、SSE で1回の delta に全文を乗せてから done を返す
+POST {{host}}/api/v1/articles/{{article_id}}/summary/stream
+HTTP 200
+[Asserts]
+header "Content-Type" == "text/event-stream"
+body contains "event: delta"
+body contains "event: done"
+body contains "{{summary_text}}"
+body not contains "event: error"
+
+# 19. 存在しない記事は 404(SSE ヘッダ送出前の通常 JSON エラー)
+POST {{host}}/api/v1/articles/999999/summary/stream
+HTTP 404
+[Asserts]
+jsonpath "$.error" exists
+
+# 20. 数値でない id は 400
+POST {{host}}/api/v1/articles/not-a-number/summary/stream
+HTTP 400
+[Asserts]
+jsonpath "$.error" exists
