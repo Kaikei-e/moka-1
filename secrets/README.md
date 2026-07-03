@@ -15,3 +15,13 @@ openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt
 | ファイル | 用途 | 参照サービス |
 |---|---|---|
 | `postgres_password.txt` | PostgreSQL の moka ユーザーのパスワード | db / migrate / moka-core |
+| `cloudflare_tunnel_token.txt` | Cloudflare Tunnel のトークン(任意・compose.tunnel.yaml 使用時のみ) | cloudflared |
+
+### Cloudflare Tunnel を使う場合(任意)
+
+1. Cloudflare Zero Trust ダッシュボードでトンネルを作成(トークン方式)
+2. 発行されたトークン文字列をそのまま保存: `echo -n "<トークン>" > secrets/cloudflare_tunnel_token.txt`
+3. `docker compose -f compose.yaml -f compose.tunnel.yaml up -d --wait`
+
+Public Hostname のルーティングや TLS(No TLS Verify)設定はダッシュボード側で完結させる。
+接続先ホスト名などの個人情報はリポジトリに書かない。

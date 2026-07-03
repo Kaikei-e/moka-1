@@ -1,0 +1,25 @@
+# Cloudflare Tunnel 専用オーバーレイ(任意)— インフラ層(外部接続経路)であり
+# tenets §1.2 の常駐サービス上限5(アプリ層: Plecto/moka-core/moka-web/db/llm)の勘定外。
+# 使い方: docker compose -f compose.yaml -f compose.tunnel.yaml up -d --wait
+# 使わない環境では compose.yaml だけで完結し、cloudflared は存在すらしない。
+#
+# トークン方式(Cloudflare Zero Trust ダッシュボードでトンネル作成 → 発行されたトークンを
+# secrets/cloudflare_tunnel_token.txt に保存)。Public Hostname のルーティング・TLS 設定は
+# ダッシュボード側で完結させる契約なので、このリポジトリには接続先ホスト名等は書かない。
+# origin service には https://plecto:443(自己署名証明書)を指定し、ダッシュボード側で
+# No TLS Verify を有効にすること(実オレジン検証は Plecto の証明書配置手順を参照)。
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.1@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283
+    command: ["tunnel", "--no-autoupdate", "run"]
+    restart: unless-stopped
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+    secrets:
+      - cloudflare_tunnel_token
+    depends_on:
+      - plecto
+
+secrets:
+  cloudflare_tunnel_token:
+    file: ./secrets/cloudflare_tunnel_token.txt
