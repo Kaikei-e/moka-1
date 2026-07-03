@@ -50,13 +50,15 @@ jsonpath "$.articles[0].published_at" isIsoDate
 jsonpath "$.articles[1].guid" == "urn:moka-e2e:2"
 jsonpath "$.next_cursor" isString
 
-# 5b. カーソルで次ページ — 重複も取りこぼしも無く、終端で next_cursor は null
+# 5b. カーソルで次ページ — 重複も取りこぼしも無く、archive 記事(guid 4-25)へ続く
+# (フィクスチャは25件。終端の null 確認は infinite-scroll シナリオ側でカバー)
 GET {{host}}/api/v1/articles?limit=2&cursor={{next_cursor}}
 HTTP 200
 [Asserts]
-jsonpath "$.articles" count == 1
+jsonpath "$.articles" count == 2
 jsonpath "$.articles[0].guid" == "urn:moka-e2e:1"
-jsonpath "$.next_cursor" == null
+jsonpath "$.articles[1].guid" == "urn:moka-e2e:4"
+jsonpath "$.next_cursor" isString
 
 # 5c. 壊れたカーソルは 400
 GET {{host}}/api/v1/articles?cursor=not-a-cursor
@@ -123,54 +125,4 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" exists
 
-# 14. 要約 — 初回は新規 201。llm(Qwen3.5-4B, ADR00007)へ実際に投げて要約を得る
-POST {{host}}/api/v1/articles/{{article_id}}/summary
-HTTP 201
-[Captures]
-summary_text: jsonpath "$.summary.text"
-[Asserts]
-jsonpath "$.summary.article_id" == {{article_id}}
-jsonpath "$.summary.text" matches /.+/
-jsonpath "$.summary.model_meta.model" matches /.+/
-jsonpath "$.summary.created_at" isIsoDate
-
-# 15. 冪等な再要約 — 200、llm を再度叩かず保存済みの要約をそのまま返す
-POST {{host}}/api/v1/articles/{{article_id}}/summary
-HTTP 200
-[Asserts]
-jsonpath "$.summary.text" == "{{summary_text}}"
-
-# 16. 存在しない記事は 404
-POST {{host}}/api/v1/articles/999999/summary
-HTTP 404
-[Asserts]
-jsonpath "$.error" exists
-
-# 17. 数値でない id は 400
-POST {{host}}/api/v1/articles/not-a-number/summary
-HTTP 400
-[Asserts]
-jsonpath "$.error" exists
-
-# 18. ストリーミング要約(専用エンドポイント)— 直前のステップで既に要約済みなので
-# 新規生成せず(llm を再度叩かない)、SSE で1回の delta に全文を乗せてから done を返す
-POST {{host}}/api/v1/articles/{{article_id}}/summary/stream
-HTTP 200
-[Asserts]
-header "Content-Type" == "text/event-stream"
-body contains "event: delta"
-body contains "event: done"
-body contains "{{summary_text}}"
-body not contains "event: error"
-
-# 19. 存在しない記事は 404(SSE ヘッダ送出前の通常 JSON エラー)
-POST {{host}}/api/v1/articles/999999/summary/stream
-HTTP 404
-[Asserts]
-jsonpath "$.error" exists
-
-# 20. 数値でない id は 400
-POST {{host}}/api/v1/articles/not-a-number/summary/stream
-HTTP 400
-[Asserts]
-jsonpath "$.error" exists
+# 要約(POST /summary, /summary/stream)は summarize.hurl に分離した(CI ではモック LLM を使う)

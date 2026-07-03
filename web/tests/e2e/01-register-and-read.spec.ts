@@ -43,8 +43,15 @@ test('記事を選ぶと読書ビューが開き、moka の要約が運ばれて
 
 	// Q&A 入力バー(こちらは M2 まで準備中のまま)
 	await expect(page.getByPlaceholder('この記事について訊く…')).toBeVisible();
+});
 
-	// 対訳へ切り替えると未訳段落のドリップが段落位置に置かれる(§5.3)
+test('対訳へ切り替えると未訳段落のドリップが段落位置に置かれる', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('link', { name: 'Third article' }).click();
+	await expect(page.getByRole('heading', { name: 'Third article' })).toBeVisible();
+
+	// 対訳へ切り替えると未訳段落のドリップが段落位置に置かれる(§5.3)。この UI 切り替え自体は
+	// フロントのみで完結し llm を呼ばない(untranslated-drip は「翻訳未着手」を示すプレースホルダ)
 	await page.getByRole('button', { name: '対訳' }).click();
 	await expect(page.getByTestId('untranslated-drip').first()).toBeVisible();
 });

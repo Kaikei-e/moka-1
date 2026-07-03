@@ -11,11 +11,16 @@ services:
       MOKA_FEED_ALLOW_PRIVATE: "true"
       # 本番 db-data とは別のボリュームに書く(e2e の登録シナリオが本番データを汚さない)
       DATABASE_URL: postgres://moka@e2e-db:5432/moka?sslmode=disable
+      # 本物の llm は GPU(iGPU Vulkan passthrough)が要り GitHub-hosted runner では起動できない。
+      # E2E は決定的なモックへ差し替える(e2e/mock-llm/mock_llm.py)
+      LLM_BASE_URL: http://e2e-llm-mock:8081/v1
     depends_on:
       e2e-db:
         condition: service_healthy
       e2e-migrate:
         condition: service_completed_successfully
+      e2e-llm-mock:
+        condition: service_healthy
 
   # Playwright がホストから叩くため(e2e 実行時のみ公開)。本番は Plecto 経由のみ
   moka-web:
@@ -23,6 +28,22 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       ORIGIN: http://localhost:3000 # form actions の origin 検査をホスト直叩きに合わせる
+
+  # 本物の llm(compose.yaml、iGPU 必須)の代わり。決定的な要約文字列を返す OpenAI 互換モック
+  # (e2e/mock-llm/mock_llm.py)。GitHub-hosted runner には GPU が無いための代替であり、
+  # moka-core → LLM クライアント → DB保存 → API → UI という配線そのものは実コードで検証する
+  e2e-llm-mock:
+    image: python:3.13-alpine
+    command: ["python3", "/mock/mock_llm.py"]
+    environment:
+      MOCK_LLM_CONTENT: "これはE2E用のモック要約です。実際のモデル推論は行っていません。"
+    volumes:
+      - ./e2e/mock-llm/mock_llm.py:/mock/mock_llm.py:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen('http://localhost:8081/health')"]
+      interval: 5s
+      start_period: 10s
+      start_interval: 1s
 
   # 決定的フィードの静的配信。nginx は ETag/Last-Modified を自動付与するので
   # 再登録シナリオが条件付き GET(304)経路を実際に通る

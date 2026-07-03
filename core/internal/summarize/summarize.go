@@ -122,11 +122,10 @@ func (s *thinkStreamStripper) feed(chunk string) string {
 	case thinkStreamInsideThink:
 		s.pending.WriteString(chunk)
 		buffered := s.pending.String()
-		idx := strings.Index(buffered, closeTag)
-		if idx == -1 {
+		_, after, ok := strings.Cut(buffered, closeTag)
+		if !ok {
 			return ""
 		}
-		after := buffered[idx+len(closeTag):]
 		s.pending.Reset()
 		s.state = thinkStreamPassthrough
 		return after
@@ -144,12 +143,11 @@ func (s *thinkStreamStripper) feed(chunk string) string {
 		rest := buffered[len(openTag):]
 		s.pending.Reset()
 		s.state = thinkStreamInsideThink
-		idx := strings.Index(rest, closeTag)
-		if idx == -1 {
+		_, after, ok := strings.Cut(rest, closeTag)
+		if !ok {
 			s.pending.WriteString(rest)
 			return ""
 		}
-		after := rest[idx+len(closeTag):]
 		s.state = thinkStreamPassthrough
 		return after
 	}

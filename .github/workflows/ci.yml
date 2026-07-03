@@ -109,6 +109,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm check
+      # vite.config.ts の "client" test project は実ブラウザ(chromium)で走る(vitest-browser-svelte)
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
 
   # ruff format/check + pyrefly + pytest(eval/ はモデル選定用ハーネス、低優先だが CI パリティは揃える)
@@ -186,12 +188,13 @@ jobs:
       - name: docker compose up (moka-core + e2e-fixtures)
         run: docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait --wait-timeout 180 moka-core e2e-fixtures
       - name: hurl
+        # summarize.hurl は本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る
         run: |
           mkdir -p e2e/hurl/reports
           hurl --test --jobs 1 --report-junit e2e/hurl/reports/junit.xml \
             --variable host=http://localhost:8080 \
             --variable fixture_url=http://e2e-fixtures/feed.xml \
-            e2e/hurl/core/feeds_and_articles.hurl
+            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl
       - name: dump compose logs
         if: always()
         run: docker compose -f compose.yaml -f compose.e2e.yaml logs --no-color > compose-logs-hurl.txt

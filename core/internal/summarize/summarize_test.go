@@ -1,6 +1,7 @@
 package summarize
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,11 +54,11 @@ func TestStripThink(t *testing.T) {
 
 // feedAll は複数チャンクを thinkStreamStripper に順に流し込み、都度の出力を連結する。
 func feedAll(s *thinkStreamStripper, chunks ...string) string {
-	var out string
+	var out strings.Builder
 	for _, c := range chunks {
-		out += s.feed(c)
+		out.WriteString(s.feed(c))
 	}
-	return out
+	return out.String()
 }
 
 func TestThinkStreamStripper(t *testing.T) {
