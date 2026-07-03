@@ -5,7 +5,8 @@ import {
 	listArticles,
 	listFeeds,
 	registerFeed,
-	summarizeArticle
+	summarizeArticle,
+	summarizeArticleStream
 } from './core';
 
 const article = {
@@ -159,5 +160,27 @@ describe('summarizeArticle', () => {
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await summarizeArticle(fetchStub(status, { error: 'x' }), 7);
 		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('summarizeArticleStream', () => {
+	it('returns the raw upstream response without parsing it (pass-through)', async () => {
+		let gotUrl = '';
+		let gotMethod = '';
+		const fetchFn: typeof fetch = async (input, init) => {
+			gotUrl = String(input);
+			gotMethod = init?.method ?? '';
+			return new Response('event: delta\ndata: {"text":"要約"}\n\n', {
+				status: 200,
+				headers: { 'Content-Type': 'text/event-stream' }
+			});
+		};
+
+		const res = await summarizeArticleStream(fetchFn, 7);
+
+		expect(gotMethod).toBe('POST');
+		expect(gotUrl).toMatch(/\/api\/v1\/articles\/7\/summary\/stream$/);
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe('event: delta\ndata: {"text":"要約"}\n\n');
 	});
 });

@@ -22,19 +22,60 @@
 		error = null;
 	});
 
+	// SSE の1イベント("event: foo\ndata: {...}"、\n\n区切り済み)を状態へ反映する。
+	// delta: 到着順に本文を連結して逐次表示。done: 保存済みの最終テキストで確定。
+	// error: 部分テキストは破棄して(moka-core 側も保存しない)失敗表示のみ残す。
+	function applySSEEvent(raw: string) {
+		let eventName = 'message';
+		let data = '';
+		for (const line of raw.split('\n')) {
+			if (line.startsWith('event: ')) eventName = line.slice('event: '.length);
+			else if (line.startsWith('data: ')) data = line.slice('data: '.length);
+		}
+		if (!data) return;
+		const payload = JSON.parse(data);
+		if (eventName === 'delta') {
+			text = (text ?? '') + payload.text;
+			loading = false;
+		} else if (eventName === 'done') {
+			text = payload.summary?.text ?? text ?? '';
+			loading = false;
+		} else if (eventName === 'error') {
+			error = payload.error ?? '要約に失敗しました。再試行してください';
+			text = null;
+			loading = false;
+		}
+	}
+
 	async function summarize() {
 		loading = true;
 		error = null;
+		text = null;
 		try {
-			const res = await fetch(`/articles/${articleId}/summary`, { method: 'POST' });
-			const body = await res.json();
-			if (!res.ok) {
+			const res = await fetch(`/articles/${articleId}/summary/stream`, { method: 'POST' });
+			if (!res.ok || !res.body) {
+				const body = await res.json().catch(() => ({}));
 				error = body.error ?? '要約に失敗しました。再試行してください';
 				return;
 			}
-			text = body.summary.text;
+
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				let sep = buffer.indexOf('\n\n');
+				while (sep !== -1) {
+					applySSEEvent(buffer.slice(0, sep));
+					buffer = buffer.slice(sep + 2);
+					sep = buffer.indexOf('\n\n');
+				}
+			}
 		} catch {
 			error = '要約に失敗しました。再試行してください';
+			text = null;
 		} finally {
 			loading = false;
 		}

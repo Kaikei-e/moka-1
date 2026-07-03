@@ -10,10 +10,23 @@ function jsonResponse(status: number, body: unknown) {
 	});
 }
 
-function deferredResponse(status: number, body: unknown) {
+type SSEEvent = { event: string; data: unknown };
+
+function sseText(events: SSEEvent[]): string {
+	return events.map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`).join('');
+}
+
+function sseResponse(status: number, events: SSEEvent[]) {
+	return new Response(sseText(events), {
+		status,
+		headers: { 'Content-Type': 'text/event-stream' }
+	});
+}
+
+function deferredSSEResponse(status: number, events: SSEEvent[]) {
 	let resolve!: () => void;
 	const gate = new Promise<void>((r) => (resolve = r));
-	const promise = gate.then(() => jsonResponse(status, body));
+	const promise = gate.then(() => sseResponse(status, events));
 	return { promise, resolve };
 }
 
@@ -34,14 +47,21 @@ describe('SummaryCard.svelte', () => {
 	});
 
 	it('shows a drip while pending, then replaces the button with the fetched summary text', async () => {
-		const { promise, resolve } = deferredResponse(200, {
-			summary: {
-				article_id: 7,
-				text: '運ばれてきた要約テキスト',
-				model_meta: {},
-				created_at: '2026-07-01T09:00:00Z'
+		const { promise, resolve } = deferredSSEResponse(200, [
+			{ event: 'delta', data: { text: '運ばれてきた要約テキスト' } },
+			{
+				event: 'done',
+				data: {
+					summary: {
+						article_id: 7,
+						text: '運ばれてきた要約テキスト',
+						model_meta: {},
+						created_at: '2026-07-01T09:00:00Z'
+					},
+					created: true
+				}
 			}
-		});
+		]);
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(() => promise)
@@ -85,14 +105,21 @@ describe('SummaryCard.svelte', () => {
 			.fn()
 			.mockResolvedValueOnce(jsonResponse(502, { error: '要約に失敗しました' }))
 			.mockResolvedValueOnce(
-				jsonResponse(200, {
-					summary: {
-						article_id: 7,
-						text: '再試行後の要約',
-						model_meta: {},
-						created_at: '2026-07-01T09:00:00Z'
+				sseResponse(200, [
+					{ event: 'delta', data: { text: '再試行後の要約' } },
+					{
+						event: 'done',
+						data: {
+							summary: {
+								article_id: 7,
+								text: '再試行後の要約',
+								model_meta: {},
+								created_at: '2026-07-01T09:00:00Z'
+							},
+							created: true
+						}
 					}
-				})
+				])
 			);
 		vi.stubGlobal('fetch', fetchMock);
 
@@ -111,14 +138,21 @@ describe('SummaryCard.svelte', () => {
 			'fetch',
 			vi.fn(() =>
 				Promise.resolve(
-					jsonResponse(200, {
-						summary: {
-							article_id: 7,
-							text: '記事7の要約',
-							model_meta: {},
-							created_at: '2026-07-01T09:00:00Z'
+					sseResponse(200, [
+						{ event: 'delta', data: { text: '記事7の要約' } },
+						{
+							event: 'done',
+							data: {
+								summary: {
+									article_id: 7,
+									text: '記事7の要約',
+									model_meta: {},
+									created_at: '2026-07-01T09:00:00Z'
+								},
+								created: true
+							}
 						}
-					})
+					])
 				)
 			)
 		);

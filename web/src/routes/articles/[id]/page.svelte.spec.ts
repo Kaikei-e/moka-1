@@ -43,6 +43,13 @@ function deferredResponse(status: number, body: unknown) {
 	return { promise, resolve };
 }
 
+type SSEEvent = { event: string; data: unknown };
+
+function sseResponse(status: number, events: SSEEvent[]) {
+	const text = events.map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`).join('');
+	return new Response(text, { status, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
 // 全文取り寄せ・要約はどちらも明示ボタンが引き金(自動取得しない)で、独立したボタンから
 // 別々の URL を叩く。同じ Page 内で両方を検証できるよう、呼び先を URL で振り分ける。
 function routeFetch(
@@ -201,14 +208,21 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 describe('articles/[id] reading view — 要約(moka による濃縮)', () => {
 	it('shows a summarize button (no auto-fetch) that fetches independently of the fulltext button', async () => {
 		const summaryFetch = vi.fn(async () =>
-			jsonResponse(200, {
-				summary: {
-					article_id: 7,
-					text: '読書ビューに運ばれてきた要約',
-					model_meta: {},
-					created_at: '2026-07-01T09:00:00Z'
+			sseResponse(200, [
+				{ event: 'delta', data: { text: '読書ビューに運ばれてきた要約' } },
+				{
+					event: 'done',
+					data: {
+						summary: {
+							article_id: 7,
+							text: '読書ビューに運ばれてきた要約',
+							model_meta: {},
+							created_at: '2026-07-01T09:00:00Z'
+						},
+						created: true
+					}
 				}
-			})
+			])
 		);
 		vi.stubGlobal('fetch', routeFetch({ summary: summaryFetch }));
 

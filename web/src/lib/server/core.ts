@@ -109,6 +109,10 @@ const summarizeErrorMessages: Record<number, string> = {
 	502: '要約に失敗しました。時間をおいて再試行してください'
 };
 
+export function summarizeErrorMessage(status: number): string {
+	return summarizeErrorMessages[status] ?? '要約に失敗しました。再試行してください';
+}
+
 // 要約は冪等(moka-core 側で保存済みなら再生成しない) — 新規 201 / 既存 200
 export async function summarizeArticle(
 	fetchFn: typeof fetch,
@@ -124,6 +128,17 @@ export async function summarizeArticle(
 	return {
 		ok: false,
 		status: res.status,
-		message: summarizeErrorMessages[res.status] ?? '要約に失敗しました。再試行してください'
+		message: summarizeErrorMessage(res.status)
 	};
+}
+
+// ストリーミング要約(POST /api/v1/articles/{id}/summary/stream)は SSE をそのまま
+// バッファせず呼び出し元(BFFルート)へ返す — パースはしない、中継に徹する。
+export async function summarizeArticleStream(
+	fetchFn: typeof fetch,
+	articleId: number
+): Promise<Response> {
+	return fetchFn(`${baseURL()}/api/v1/articles/${articleId}/summary/stream`, {
+		method: 'POST'
+	});
 }
