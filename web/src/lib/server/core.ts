@@ -19,10 +19,21 @@ export type RegisterResult =
 	| { ok: true; created: boolean; feed: Feed; insertedArticles: number }
 	| { ok: false; status: number; message: string };
 
-export async function listArticles(fetchFn: typeof fetch, limit = 50): Promise<Article[]> {
-	const res = await fetchFn(`${baseURL()}/api/v1/articles?limit=${limit}`);
+export type ArticlesPage = { articles: Article[]; nextCursor: string | null };
+
+// カーソルベース(keyset)ページング。cursor 省略時は先頭ページ(サイドバーの無限スクロールと
+// SSR 初期表示の両方がこれを使う — 前者は articles/+server.ts 経由、後者は +layout.server.ts 直)
+export async function listArticlesPage(
+	fetchFn: typeof fetch,
+	limit = 20,
+	cursor?: string | null
+): Promise<ArticlesPage> {
+	const params = new URLSearchParams({ limit: String(limit) });
+	if (cursor) params.set('cursor', cursor);
+	const res = await fetchFn(`${baseURL()}/api/v1/articles?${params}`);
 	if (!res.ok) throw new Error(`moka-core list articles: ${res.status}`);
-	return articlesResponseSchema.parse(await res.json()).articles;
+	const body = articlesResponseSchema.parse(await res.json());
+	return { articles: body.articles, nextCursor: body.next_cursor };
 }
 
 export async function getArticle(fetchFn: typeof fetch, id: number): Promise<Article | null> {

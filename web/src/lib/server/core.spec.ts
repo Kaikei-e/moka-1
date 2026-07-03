@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	fetchFullText,
 	getArticle,
-	listArticles,
+	listArticlesPage,
 	listFeeds,
 	registerFeed,
 	summarizeArticle,
@@ -35,25 +35,62 @@ function fetchStub(status: number, body: unknown): typeof fetch {
 		});
 }
 
-describe('listArticles', () => {
-	it('parses the articles envelope (cursor-based contract)', async () => {
-		const got = await listArticles(fetchStub(200, { articles: [article], next_cursor: null }));
-		expect(got).toHaveLength(1);
-		expect(got[0]?.title).toBe('Seven');
+describe('listArticlesPage', () => {
+	it('parses the articles envelope and exposes the next cursor (pagination contract)', async () => {
+		const got = await listArticlesPage(fetchStub(200, { articles: [article], next_cursor: 'abc' }));
+		expect(got.articles).toHaveLength(1);
+		expect(got.articles[0]?.title).toBe('Seven');
+		expect(got.nextCursor).toBe('abc');
+	});
+
+	it('reports a null next cursor at the end of the list', async () => {
+		const got = await listArticlesPage(fetchStub(200, { articles: [article], next_cursor: null }));
+		expect(got.nextCursor).toBeNull();
+	});
+
+	it('requests the given limit and, when provided, the cursor', async () => {
+		let requestedUrl = '';
+		const fetchFn: typeof fetch = async (input) => {
+			requestedUrl = String(input);
+			return new Response(JSON.stringify({ articles: [], next_cursor: null }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		};
+
+		await listArticlesPage(fetchFn, 20, 'my-cursor');
+
+		expect(requestedUrl).toContain('limit=20');
+		expect(requestedUrl).toContain('cursor=my-cursor');
+	});
+
+	it('omits the cursor param when none is given (first page)', async () => {
+		let requestedUrl = '';
+		const fetchFn: typeof fetch = async (input) => {
+			requestedUrl = String(input);
+			return new Response(JSON.stringify({ articles: [], next_cursor: null }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		};
+
+		await listArticlesPage(fetchFn, 20);
+
+		expect(requestedUrl).not.toContain('cursor=');
 	});
 
 	it('rejects a response that does not match the schema', async () => {
 		await expect(
-			listArticles(fetchStub(200, { articles: [{ id: 'x' }], next_cursor: null }))
+			listArticlesPage(fetchStub(200, { articles: [{ id: 'x' }], next_cursor: null }))
 		).rejects.toThrow();
 	});
 
 	it('rejects a response missing next_cursor (contract drift guard)', async () => {
-		await expect(listArticles(fetchStub(200, { articles: [article] }))).rejects.toThrow();
+		await expect(listArticlesPage(fetchStub(200, { articles: [article] }))).rejects.toThrow();
 	});
 
 	it('rejects on a non-200 status', async () => {
-		await expect(listArticles(fetchStub(500, { error: 'internal error' }))).rejects.toThrow();
+		await expect(listArticlesPage(fetchStub(500, { error: 'internal error' }))).rejects.toThrow();
 	});
 });
 
