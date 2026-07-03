@@ -93,16 +93,21 @@ CREATE TABLE article_tags (
 
 CREATE INDEX article_tags_tag_idx ON article_tags (tag_id);
 
--- 埋め込みの成果。次元は埋め込みモデル最終選定後に固定する(tenets §8-1)。HNSW もその時に
+-- 埋め込みの成果。1024次元 = Qwen3-Embedding-0.6B ネイティブ(ADR00008)。
+-- 次点 bge-m3 と同次元、4B 格上げ時も MRL 切り詰めで列互換
 CREATE TABLE article_embeddings (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     article_id BIGINT NOT NULL REFERENCES articles (id) ON DELETE CASCADE,
-    embedding  vector NOT NULL,
+    embedding  vector(1024) NOT NULL,
     model      TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX article_embeddings_latest_idx ON article_embeddings (article_id, created_at DESC);
+
+-- 類似検索(cosine — eval/ の retrieval 評価と同一距離)
+CREATE INDEX article_embeddings_hnsw_idx ON article_embeddings
+    USING hnsw (embedding vector_cosine_ops);
 
 -- 既読の事実。未読 = 行が無い
 CREATE TABLE article_reads (
