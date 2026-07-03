@@ -26,12 +26,14 @@ func NewMux(
 	mux.HandleFunc("GET /api/v1/articles/{id}", handleGetArticle(article))
 	mux.HandleFunc("POST /api/v1/articles/{id}/fulltext", handleFetchFullText(article, fullTexts))
 	mux.HandleFunc("POST /api/v1/articles/{id}/summary", handleSummarizeArticle(article, summarizer))
+	mux.HandleFunc("POST /api/v1/articles/{id}/summary/stream", handleSummarizeArticleStream(article, summarizer))
 	// メソッド無しパターンはメソッド不一致時の受け皿(無いと /api/ スタブが 501 で拾ってしまう)
 	mux.HandleFunc("/api/v1/feeds", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/fulltext", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/summary", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/articles/{id}/summary/stream", handleMethodNotAllowed)
 	mux.HandleFunc("/api/", handleAPIStub)
 	return mux
 }

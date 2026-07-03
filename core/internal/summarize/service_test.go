@@ -75,6 +75,12 @@ type fakeCompleter struct {
 	err      error
 	gotText  string
 	numCalls int
+
+	// streamChunks はストリーム版が呼ばれた際に onRawDelta へ順に流す生チャンク。
+	// 空なら result.Text をまるごと1チャンクとして流す。
+	streamChunks []string
+	streamErr    error
+	streamCalls  int
 }
 
 func (c *fakeCompleter) Complete(_ context.Context, text string) (CompletionResult, error) {
@@ -82,6 +88,24 @@ func (c *fakeCompleter) Complete(_ context.Context, text string) (CompletionResu
 	c.gotText = text
 	if c.err != nil {
 		return CompletionResult{}, c.err
+	}
+	return c.result, nil
+}
+
+func (c *fakeCompleter) CompleteStream(
+	_ context.Context, text string, onRawDelta func(string),
+) (CompletionResult, error) {
+	c.streamCalls++
+	c.gotText = text
+	if c.streamErr != nil {
+		return CompletionResult{}, c.streamErr
+	}
+	chunks := c.streamChunks
+	if len(chunks) == 0 && c.result.Text != "" {
+		chunks = []string{c.result.Text}
+	}
+	for _, chunk := range chunks {
+		onRawDelta(chunk)
 	}
 	return c.result, nil
 }
@@ -220,5 +244,116 @@ func TestServiceSummarize(t *testing.T) {
 		require.Len(t, store.attempts, 1)
 		assert.Equal(t, fakeAttempt{7, "summary", "succeeded", ""}, store.attempts[0])
 		assert.Equal(t, false, res.Summary.ModelMeta["think_stripped"])
+	})
+}
+
+func TestServiceSummarizeStream(t *testing.T) {
+	t.Parallel()
+
+	t.Run("existing summary is idempotent: emits the whole text once and never calls llm", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{}
+		var deltas []string
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+			deltas = append(deltas, d)
+		})
+		require.NoError(t, err)
+
+		assert.False(t, res.Created)
+		assert.Equal(t, []string{"既存の要約"}, deltas)
+		assert.Zero(t, comp.streamCalls)
+	})
+
+	t.Run("new summary streams deltas as they arrive and saves the final stripped text", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{
+			streamChunks: []string{"要約", "結果です"},
+			result:       CompletionResult{Text: "要約結果です", Meta: map[string]any{"model": "m"}},
+		}
+		var deltas []string
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+			deltas = append(deltas, d)
+		})
+		require.NoError(t, err)
+
+		assert.True(t, res.Created)
+		// 先頭バッファ方式(<think>判定用に最低 len("<think>") バイト分は内部で溜める)
+		// のため、最初の数チャンクは1回のコールバックに統合されうる。連結結果を検証する。
+		assert.Equal(t, "要約結果です", strings.Join(deltas, ""))
+		require.Len(t, store.inserted, 1)
+		assert.Equal(t, "要約結果です", store.inserted[0].Text)
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "succeeded", store.attempts[0].outcome)
+	})
+
+	t.Run("think tag is buffered and never leaked to the stream callback", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{
+			streamChunks: []string{"<thi", "nk>推論</thi", "nk>本文の要約"},
+			result:       CompletionResult{Text: "<think>推論</think>本文の要約", Meta: map[string]any{"model": "m"}},
+		}
+		var deltas []string
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+			deltas = append(deltas, d)
+		})
+		require.NoError(t, err)
+
+		assert.True(t, res.Created)
+		assert.Equal(t, "本文の要約", strings.Join(deltas, ""))
+		assert.Equal(t, "本文の要約", res.Summary.Text)
+		assert.Equal(t, true, res.Summary.ModelMeta["think_stripped"])
+	})
+
+	t.Run("unclosed think tag: nothing streamed, discarded (not saved), recorded as failed", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{
+			streamChunks: []string{"<think>", "途中で切れた推論"},
+			result:       CompletionResult{Text: "<think>途中で切れた推論"},
+		}
+		var deltas []string
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+			deltas = append(deltas, d)
+		})
+		require.ErrorIs(t, err, ErrEmptyCompletion)
+		assert.Empty(t, deltas)
+		assert.Empty(t, store.inserted)
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "failed", store.attempts[0].outcome)
+	})
+
+	t.Run("llm stream failure is wrapped as ErrLLMUnavailable, nothing saved", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{streamErr: assert.AnError}
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+		assert.Empty(t, store.inserted)
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "failed", store.attempts[0].outcome)
+	})
+
+	t.Run("no content at all returns ErrNoContent without touching the llm", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{}
+		ft := &fakeFullTexts{found: false}
+		comp := &fakeCompleter{}
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "", func(string) {})
+		require.ErrorIs(t, err, ErrNoContent)
+		assert.Zero(t, comp.streamCalls)
 	})
 }

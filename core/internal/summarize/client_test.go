@@ -105,3 +105,99 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 	})
 }
+
+func TestHTTPCompleterCompleteStream(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sends stream:true and delivers deltas in order via callback", func(t *testing.T) {
+		t.Parallel()
+
+		var gotBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/chat/completions", r.URL.Path)
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "text/event-stream")
+			flusher := w.(http.Flusher)
+			for _, chunk := range []string{
+				`{"model":"unsloth/Qwen3.5-4B-GGUF:Q4_K_M","choices":[{"delta":{"content":"要約"}}]}`,
+				`{"model":"unsloth/Qwen3.5-4B-GGUF:Q4_K_M","choices":[{"delta":{"content":"結果"}}]}`,
+				`{"model":"unsloth/Qwen3.5-4B-GGUF:Q4_K_M","choices":[{"delta":{},"finish_reason":"stop"}]}`,
+			} {
+				_, _ = w.Write([]byte("data: " + chunk + "\n\n"))
+				flusher.Flush()
+			}
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			flusher.Flush()
+		}))
+		defer srv.Close()
+
+		c := NewHTTPCompleter(srv.URL, srv.Client())
+		var deltas []string
+		res, err := c.CompleteStream(t.Context(), "記事本文", func(delta string) {
+			deltas = append(deltas, delta)
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"要約", "結果"}, deltas)
+		assert.Equal(t, "要約結果", res.Text)
+		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Meta["model"])
+		assert.InDelta(t, 0.7, res.Meta["temperature"], 0.0001)
+
+		assert.Equal(t, true, gotBody["stream"])
+		messages, ok := gotBody["messages"].([]any)
+		require.True(t, ok)
+		require.Len(t, messages, 2)
+		user := messages[1].(map[string]any)
+		assert.Equal(t, "記事本文", user["content"])
+	})
+
+	t.Run("non-2xx response is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		defer srv.Close()
+
+		c := NewHTTPCompleter(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+	})
+
+	t.Run("malformed chunk is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			flusher := w.(http.Flusher)
+			_, _ = w.Write([]byte("data: not json\n\n"))
+			flusher.Flush()
+		}))
+		defer srv.Close()
+
+		c := NewHTTPCompleter(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+	})
+
+	t.Run("stream with no chunks at all is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+		}))
+		defer srv.Close()
+
+		c := NewHTTPCompleter(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+	})
+
+	t.Run("connection failure is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+		t.Parallel()
+
+		c := NewHTTPCompleter("http://127.0.0.1:1", http.DefaultClient)
+		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+	})
+}

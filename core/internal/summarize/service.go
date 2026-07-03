@@ -77,6 +77,71 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 	return Result{Summary: sum, Created: true}, nil
 }
 
+// SummarizeStream は Summarize のストリーミング版。既に保存済みなら(冪等)llm を
+// 呼ばず既存テキストを1回の onDelta で返す。新規生成時は生チャンクを
+// thinkStreamStripper に通し、think ブロックの外側だけを onDelta で逐次流す
+// (専用の /summary/stream エンドポイント用)。最終的な保存判定は Summarize と同じ
+// stripThink(完全な生テキスト) — ストリーミング中の見た目はあくまで補助であり、
+// 接続断・LLM失敗時は部分テキストを一切保存せず failed のみ記録する(ADR00014 §7 踏襲)。
+func (s *Service) SummarizeStream(
+	ctx context.Context, articleID int64, articleContent string, onDelta func(delta string),
+) (Result, error) {
+	existing, found, err := s.store.LatestSummary(ctx, articleID)
+	if err != nil {
+		return Result{}, fmt.Errorf("lookup summary %d: %w", articleID, err)
+	}
+	if found {
+		onDelta(existing.Text)
+		return Result{Summary: existing, Created: false}, nil
+	}
+
+	text, err := s.resolveText(ctx, articleID, articleContent)
+	if err != nil {
+		return Result{}, s.fail(ctx, articleID, err)
+	}
+
+	if len(text) > maxInputChars {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("%d chars: %w", len(text), ErrArticleTooLong))
+	}
+
+	var stripper thinkStreamStripper
+	completion, err := s.complete.CompleteStream(ctx, text, func(rawDelta string) {
+		if chunk := stripper.feed(rawDelta); chunk != "" {
+			onDelta(chunk)
+		}
+	})
+	if err != nil {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("complete: %w (%w)", ErrLLMUnavailable, err))
+	}
+	if flush, _ := stripper.finish(); flush != "" {
+		onDelta(flush)
+	}
+
+	summaryText, stripped, closed := stripThink(completion.Text)
+	if !closed {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("think tag truncated: %w", ErrEmptyCompletion))
+	}
+	if summaryText == "" {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("blank after think-strip: %w", ErrEmptyCompletion))
+	}
+
+	meta := completion.Meta
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	meta["think_stripped"] = stripped
+
+	sum, err := s.store.InsertSummary(ctx, articleID, summaryText, meta)
+	if err != nil {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("insert summary %d: %w", articleID, err))
+	}
+
+	if attemptErr := s.store.InsertEnrichmentAttempt(ctx, articleID, attemptKind, "succeeded", ""); attemptErr != nil {
+		s.log.Warn("record enrichment attempt", "article_id", articleID, "err", attemptErr.Error())
+	}
+	return Result{Summary: sum, Created: true}, nil
+}
+
 // resolveText は要約対象のテキストを決める: 全文取り寄せ済みならそれを優先し、
 // 無ければ呼び出し元が渡した articleContent(フィード由来)にフォールバックする。
 func (s *Service) resolveText(ctx context.Context, articleID int64, articleContent string) (string, error) {
