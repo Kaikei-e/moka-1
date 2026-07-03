@@ -26,5 +26,162 @@
       <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
       <description>Body of the third fixture article.</description>
     </item>
+    <!-- 無限スクロール検証用の archive 記事(guid 4-25、22件)。First article より前の日付で
+         新しい順ソートの先頭3件(1-3)を崩さない。初期ページ(limit=20)は 3 + guid4-20 の
+         17件で埋まり、guid21-25 の5件が2ページ目(next_cursor が null になる終端)になる -->
+    <item>
+      <title>Archive article 4</title>
+      <link>http://e2e-fixtures/articles/4</link>
+      <guid isPermaLink="false">urn:moka-e2e:4</guid>
+      <pubDate>Sun, 28 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 4.</description>
+    </item>
+    <item>
+      <title>Archive article 5</title>
+      <link>http://e2e-fixtures/articles/5</link>
+      <guid isPermaLink="false">urn:moka-e2e:5</guid>
+      <pubDate>Sat, 27 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 5.</description>
+    </item>
+    <item>
+      <title>Archive article 6</title>
+      <link>http://e2e-fixtures/articles/6</link>
+      <guid isPermaLink="false">urn:moka-e2e:6</guid>
+      <pubDate>Fri, 26 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 6.</description>
+    </item>
+    <item>
+      <title>Archive article 7</title>
+      <link>http://e2e-fixtures/articles/7</link>
+      <guid isPermaLink="false">urn:moka-e2e:7</guid>
+      <pubDate>Thu, 25 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 7.</description>
+    </item>
+    <item>
+      <title>Archive article 8</title>
+      <link>http://e2e-fixtures/articles/8</link>
+      <guid isPermaLink="false">urn:moka-e2e:8</guid>
+      <pubDate>Wed, 24 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 8.</description>
+    </item>
+    <item>
+      <title>Archive article 9</title>
+      <link>http://e2e-fixtures/articles/9</link>
+      <guid isPermaLink="false">urn:moka-e2e:9</guid>
+      <pubDate>Tue, 23 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 9.</description>
+    </item>
+    <item>
+      <title>Archive article 10</title>
+      <link>http://e2e-fixtures/articles/10</link>
+      <guid isPermaLink="false">urn:moka-e2e:10</guid>
+      <pubDate>Mon, 22 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 10.</description>
+    </item>
+    <item>
+      <title>Archive article 11</title>
+      <link>http://e2e-fixtures/articles/11</link>
+      <guid isPermaLink="false">urn:moka-e2e:11</guid>
+      <pubDate>Sun, 21 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 11.</description>
+    </item>
+    <item>
+      <title>Archive article 12</title>
+      <link>http://e2e-fixtures/articles/12</link>
+      <guid isPermaLink="false">urn:moka-e2e:12</guid>
+      <pubDate>Sat, 20 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 12.</description>
+    </item>
+    <item>
+      <title>Archive article 13</title>
+      <link>http://e2e-fixtures/articles/13</link>
+      <guid isPermaLink="false">urn:moka-e2e:13</guid>
+      <pubDate>Fri, 19 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 13.</description>
+    </item>
+    <item>
+      <title>Archive article 14</title>
+      <link>http://e2e-fixtures/articles/14</link>
+      <guid isPermaLink="false">urn:moka-e2e:14</guid>
+      <pubDate>Thu, 18 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 14.</description>
+    </item>
+    <item>
+      <title>Archive article 15</title>
+      <link>http://e2e-fixtures/articles/15</link>
+      <guid isPermaLink="false">urn:moka-e2e:15</guid>
+      <pubDate>Wed, 17 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 15.</description>
+    </item>
+    <item>
+      <title>Archive article 16</title>
+      <link>http://e2e-fixtures/articles/16</link>
+      <guid isPermaLink="false">urn:moka-e2e:16</guid>
+      <pubDate>Tue, 16 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 16.</description>
+    </item>
+    <item>
+      <title>Archive article 17</title>
+      <link>http://e2e-fixtures/articles/17</link>
+      <guid isPermaLink="false">urn:moka-e2e:17</guid>
+      <pubDate>Mon, 15 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 17.</description>
+    </item>
+    <item>
+      <title>Archive article 18</title>
+      <link>http://e2e-fixtures/articles/18</link>
+      <guid isPermaLink="false">urn:moka-e2e:18</guid>
+      <pubDate>Sun, 14 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 18.</description>
+    </item>
+    <item>
+      <title>Archive article 19</title>
+      <link>http://e2e-fixtures/articles/19</link>
+      <guid isPermaLink="false">urn:moka-e2e:19</guid>
+      <pubDate>Sat, 13 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 19.</description>
+    </item>
+    <item>
+      <title>Archive article 20</title>
+      <link>http://e2e-fixtures/articles/20</link>
+      <guid isPermaLink="false">urn:moka-e2e:20</guid>
+      <pubDate>Fri, 12 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 20.</description>
+    </item>
+    <item>
+      <title>Archive article 21</title>
+      <link>http://e2e-fixtures/articles/21</link>
+      <guid isPermaLink="false">urn:moka-e2e:21</guid>
+      <pubDate>Thu, 11 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 21.</description>
+    </item>
+    <item>
+      <title>Archive article 22</title>
+      <link>http://e2e-fixtures/articles/22</link>
+      <guid isPermaLink="false">urn:moka-e2e:22</guid>
+      <pubDate>Wed, 10 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 22.</description>
+    </item>
+    <item>
+      <title>Archive article 23</title>
+      <link>http://e2e-fixtures/articles/23</link>
+      <guid isPermaLink="false">urn:moka-e2e:23</guid>
+      <pubDate>Tue, 09 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 23.</description>
+    </item>
+    <item>
+      <title>Archive article 24</title>
+      <link>http://e2e-fixtures/articles/24</link>
+      <guid isPermaLink="false">urn:moka-e2e:24</guid>
+      <pubDate>Mon, 08 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 24.</description>
+    </item>
+    <item>
+      <title>Archive article 25</title>
+      <link>http://e2e-fixtures/articles/25</link>
+      <guid isPermaLink="false">urn:moka-e2e:25</guid>
+      <pubDate>Sun, 07 Jun 2026 09:00:00 GMT</pubDate>
+      <description>Body of archive fixture article 25.</description>
+    </item>
   </channel>
 </rss>

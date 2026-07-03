@@ -19,10 +19,10 @@ test('空状態のホームからフィードを登録すると記事が並ぶ',
 	await expect(page.getByText('登録しました')).toBeVisible();
 	await expect(page.getByText('Moka E2E Fixture')).toBeVisible();
 
-	// ホームに戻ると記事リスト(新しい順)が並ぶ
+	// ホームに戻ると記事リスト(新しい順)が並ぶ。初期表示は無限スクロールの1ページ目(20件)
 	await page.goto('/');
 	const articleLinks = page.getByRole('link', { name: /article/ });
-	await expect(articleLinks).toHaveCount(3);
+	await expect(articleLinks).toHaveCount(20);
 	await expect(articleLinks.first()).toHaveText(/Third article/);
 });
 

@@ -19,7 +19,7 @@ feed_id: jsonpath "$.feed.id"
 jsonpath "$.feed.url" == "{{fixture_url}}"
 jsonpath "$.feed.title" == "Moka E2E Fixture"
 jsonpath "$.feed.created_at" isIsoDate
-jsonpath "$.inserted_articles" == 3
+jsonpath "$.inserted_articles" == 25
 
 # 3. 冪等な再登録 → 200、条件付き GET(nginx ネイティブ 304)で挿入 0
 POST {{host}}/api/v1/feeds
