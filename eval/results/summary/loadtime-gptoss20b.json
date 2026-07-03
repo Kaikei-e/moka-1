@@ -1,0 +1,11 @@
+{
+  "model_key": "gptoss20b",
+  "model_hf": "ggml-org/gpt-oss-20b-GGUF",
+  "load_times_s": [
+    15.1,
+    5.1,
+    4.0
+  ],
+  "note": "1回目=コールド寄り、以降=ページキャッシュ次第(ホストRAM16GB)",
+  "created_at": "2026-07-02T15:28:59+00:00"
+}

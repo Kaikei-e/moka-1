@@ -1,0 +1,13 @@
+{
+  "spike": "ruri-v3-310m 自前GGUF変換(ADR00008 watch最有力の検証)",
+  "date": "2026-07-03",
+  "verdict": "blocked-upstream",
+  "findings": [
+    "cl-nagoya/ruri-v3-310m の config.json は architectures=[\"ModernBertModel\"], model_type=modernbert(取得・確認済み)",
+    "llama.cpp b9859: C++ランタイム(src/llama-arch.cpp)と gguf-py/gguf/constants.py には modern-bert アーキが存在する",
+    "しかし convert_hf_to_gguf.py には ModernBert 変換クラスが存在しない(b9859 と master の両方で確認、2026-07-03時点)",
+    "既存のコミュニティ modern-bert GGUF はパッチ版コンバータ製という調査結果(results/research/embedding-candidates.json)と整合"
+  ],
+  "conclusion": "公式変換パスが無いため配布元縛り・再現性の両面で採用不可。独自コンバータ実装はスパイク範囲外(トークナイザ=SentencePiece × BERT系のテンソル/メタデータ対応が必要)",
+  "retry_when": "upstream の convert_hf_to_gguf.py に ModernBertModel 対応クラスがマージされたら、eval/ の retrieval評価 + パラフレーズ健全性チェック(scratchpad/ruri_spike_eval.py 相当)で即再検証する"
+}

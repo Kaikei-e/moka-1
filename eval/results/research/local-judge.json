@@ -1,0 +1,89 @@
+{
+  "summary": "ローカル小型モデルによるLLM-as-judgeの標準運用は「ペアワイズ+位置スワップ2オーダー+不一致はtie扱い」であり、arXiv 2406.07791はGPT-4級でも位置一貫性0.82程度(GPT-3.5は0.70)で、品質差が小さいペアほどバイアスが増大することを15審判・15万判定で定量化した。同族バイアスは実在し(GPT-4o/Claude 3.5が自己・同族出力を系統的に高評価、機構は低perplexity選好)、Qwen審判がQwen候補を裁く構成は避けるか補正が必要。20B級ではgpt-oss-20bが安全性判定89.1%・Kendall τ0.50とClaude-Sonnet-4(94.3%/0.55)に迫る報告があり、思考(reasoning)を有効にした運用が前提となる。プロトコル面では「自由記述CoT→末尾verdictタグ抽出」が鉄則で、json_schemaで生成全体を縛ると推論性能が10–15%劣化する。日本語要約評価はFineSurE(忠実性/網羅性/簡潔さ)+llm-jp-judgeの知見(流暢性レンズは人手相関0.48で飽和し判別力が低い)を組み合わせるのが妥当。",
+  "key_findings": [
+    {
+      "finding": "位置バイアス(arXiv 2406.07791, AACL 2025): 15審判×MTBench/DevBench×15万判定超の系統調査。位置一貫性はMTBenchペアワイズでGPT-4が0.82±0.15、GPT-3.5-Turboが0.70±0.18、Claude-3.5-Sonnetが0.82±0.14、DevBenchではLlama-3.3-70Bが0.89±0.12。つまり最強級審判でも約2割の判定が提示順で反転する。反復安定性(同一入力の再判定)は0.95超でバイアスはランダムノイズではなく系統的。品質差が小さいペアほど位置バイアスが増大する放物線的関係が全審判で確認された。緩和策としては不一致判定を捨てるのではなく『不一致=tie』として比例配分する運用を推奨(MT-Bench原論文のswap+両順一致のみ勝ちの発展形)。モデルが大きく/強いほど位置一貫性は高い傾向。",
+      "confidence": "high",
+      "sources": [
+        "https://arxiv.org/abs/2406.07791",
+        "https://arxiv.org/html/2406.07791v9"
+      ]
+    },
+    {
+      "finding": "同族バイアス(self-preference / family bias)は実証済み: arXiv 2410.21819はGPT-4に有意なself-preferenceを確認し、機構として『LLMは自己生成か否かに関わらず低perplexity(=自分に馴染む)テキストを人間より高く評価する』ことを示した。arXiv 2508.06709(Play Favorites)は第三者(人間)品質を統制した統計モデルで、GPT-4oとClaude 3.5 Sonnetが自己出力に系統的に高スコアを与え、同族(family)出力も競合族より優遇することを9審判×5000ペア超で確認。したがってQwen審判がQwen候補を含む比較を裁く構成は、Qwen候補が実力以上に勝つ方向のバイアスを持つと想定すべき。審判は候補と別族から選ぶのが第一原則。",
+      "confidence": "high",
+      "sources": [
+        "https://arxiv.org/abs/2410.21819",
+        "https://arxiv.org/html/2508.06709v1"
+      ]
+    },
+    {
+      "finding": "20B級ローカル審判の信頼性: gpt-oss-20bはSafeSearch(arXiv 2510.17017)で安全性判定精度89.1%・有用性評価Kendall τ0.50を記録しClaude-Sonnet-4(94.3%/τ0.55)に肉薄、Llama-Guard-4-12Bを大幅に上回る。脆弱性検出のjudge用途では400サンプルで99%超の判定精度の報告もあるが、反復生成(壊れた出力)の頻発と、high reasoning設定でのECR@1 85.4%という運用上の不安定さも報告されている。JudgeBench(ICLR 2025)は難関で上位報酬モデルでも約64%、小型Qwen3審判は1.7Bで44.4%・4Bで57.3%に留まり、10B未満の審判は非推奨。Qwen3-30B-A3B級は報酬モデル用途で80.3→84.6%(総合平均)の報告があるが、思考(reasoning)を切ると最大52%の性能劣化という不安定性があり、審判として使うなら思考モード必須。",
+      "confidence": "medium",
+      "sources": [
+        "https://arxiv.org/pdf/2510.17017",
+        "https://arxiv.org/pdf/2410.12784",
+        "https://arxiv.org/html/2606.07810",
+        "https://arxiv.org/pdf/2507.09104"
+      ]
+    },
+    {
+      "finding": "推論(reasoning)モデル審判は精度は高いがバイアスに弱い: arXiv 2601.03630はDeepSeek/Qwen系の比較でLRM(思考モデル)がRewardBench/JudgeBenchで一貫して高精度な一方、長さ・冗長性・具体性など表層特徴を突く敵対的応答に対しバイアスベンチ(LLMBar等)で15ポイント以上劣化することを示した。対策として『先に評価計画(観点リスト)を明示生成→実行』の2段階(PlanJudge)が訓練なしでバイアス指標を最大32ポイント改善。moka-1のjudgeプロンプトでも観点(レンズ)を先に固定列挙する設計が有効。",
+      "confidence": "medium",
+      "sources": [
+        "https://arxiv.org/html/2601.03630v1/"
+      ]
+    },
+    {
+      "finding": "pairwise vs pointwiseとサンプリング: pairwiseは判別感度が高いが位置バイアス・distractorに脆弱で、pointwise(G-Eval型)より判定フリップが多い(サーベイ報告で~35% vs ~9%)。G-Eval(CoT+rubric+form-filling)はpointwiseの標準形で、明示的ルーブリック(スコア記述子付き)を落とすと人手相関が大幅に劣化する。判定サンプリングはtemperature≈1+集計(平均/多数決)がgreedyより人手相関が高いという報告がある一方、『Nine Judges, Two Effective Votes』(arXiv 2605.29800)は同族・同型審判のパネルは誤りが相関するため単独最良審判に対する上積みがほぼゼロか負であることを示した。多数決を組むなら異族審判で構成しないと意味が薄い。",
+      "confidence": "medium",
+      "sources": [
+        "https://arxiv.org/html/2412.05579v1",
+        "https://www.confident-ai.com/blog/g-eval-the-definitive-guide",
+        "https://arxiv.org/pdf/2605.29800",
+        "https://orq.ai/blog/llm-juries-in-practice"
+      ]
+    },
+    {
+      "finding": "構造化出力の罠(arXiv 2408.02442 Let Me Speak Freely?): JSON-mode等の形式制約を推論生成そのものに課すと、数学・記号推論・複雑分析タスクで10–15%の性能劣化。制約が厳しいほど劣化が大きい。推奨は『自由記述で推論→最後にverdictを軽量フォーマット(例: [[A]])で出させて正規表現抽出、あるいは推論後に別パスで構造化変換』。llama.cppのjson_schema(GBNF)グラマーをjudge生成全体に適用するのは避けるべき。",
+      "confidence": "high",
+      "sources": [
+        "https://arxiv.org/abs/2408.02442",
+        "https://arxiv.org/html/2408.02442v1"
+      ]
+    },
+    {
+      "finding": "日本語評価の観点設計: llm-jp-judge(NII LLMC, NLP2025, Apache-2.0)は正確性/流暢性/詳細性/関連性/総合の5観点を1–5点で、『理由を先に述べてから [[N]] 形式でスコア』のプロンプトを採用。ichikara-instruction 101問×10モデルの人手評価とのメタ評価でピアソン相関は正確性0.92・詳細性0.78・関連性0.98・総合0.94と高い一方、流暢性は0.48と低い(現代LLMはほぼ全モデル4.8–5.0で飽和し判別力がない)。また自動評価は正確性・流暢性を人手より高く見積もる傾向(甘い)が確認されている。つまり日本語では『流暢性/自然さ』を独立レンズにする価値は低く、忠実性系レンズの甘さを前提に設計する必要がある。",
+      "confidence": "high",
+      "sources": [
+        "https://www.anlp.jp/proceedings/annual_meeting/2025/pdf_dir/Q2-4.pdf",
+        "https://github.com/llm-jp/llm-jp-judge"
+      ]
+    },
+    {
+      "finding": "要約特化の観点セット: FineSurE(ACL 2024, arXiv 2407.00908)は要約評価を忠実性(faithfulness)/網羅性(completeness)/簡潔さ(conciseness)の3軸に分解し、忠実性は要約を文単位に分割して各文をfact-check(誤り型: out-of-context/entity/predicate/circumstance/coreference/discourse/grammar)、網羅性・簡潔さは原文keyfactと要約文のアラインメントで機械的に算出する。GPT-4で文レベル事実誤り検出86.4% balanced accuracy。Likertで直接5点をつけるより、二値判定の集計でスコアを構成する方が小型審判でも精度が出やすい設計として参考になる。",
+      "confidence": "high",
+      "sources": [
+        "https://arxiv.org/abs/2407.00908",
+        "https://aclanthology.org/2024.acl-long.51/"
+      ]
+    },
+    {
+      "finding": "RewardBench 2(ICLR 2026)は生成型judgeの新標準ベンチ。1,865問をFactuality/Focus/Math/Precise IF/Safety/Tieの6サブセットで構成し、Tieサブセット(引き分け判定能力)を明示的に測るのが特徴。ローカル審判候補の選定・更新時はここのgenerative judgeスコアを参照するのが良い。",
+      "confidence": "medium",
+      "sources": [
+        "https://arxiv.org/html/2506.01937",
+        "https://openreview.net/pdf?id=fb0G86Dewb"
+      ]
+    }
+  ],
+  "recommendations": [
+    "審判配役: 主審は現行pinの ggml-org/gpt-oss-20b MXFP4(reasoning_effort=medium)を流用。候補群(LFM2.5/Qwen3.5/gemma/Qwen3.6)と別族なので同族バイアスが最小で、追加VRAMゼロ。gpt-oss自身の出力を裁く比較(集約役の評価)だけは同族バイアスがかかるため、その場合のみQwen3.5-35B-A3B(思考ON)を副審に立て、両審判一致のみ採用する。10B未満のモデルを審判にしない(JudgeBenchで4B級57%と実用未満)。",
+    "比較方式: ペアワイズを基本とし、必ず位置スワップの2オーダーで判定。両順で同じ勝者のときのみwin、不一致およびtie宣言はtieとして集計(inconsistency-as-a-tie)。tie率そのものを『品質差の小ささ』の指標としてレポートに残す。pointwise(G-Eval型1–5)は回帰テスト用の絶対スコア監視に限定し、モデル採否判断はpairwiseで行う。",
+    "レンズ(観点)は4つ: (1)忠実性=要約を文分割し各文を原文に対して二値fact-check(FineSurE方式、ハルシネーション率を算出)、(2)網羅性=原文から抽出したkeyfactが要約に含まれるかのアラインメント率、(3)簡潔さ=keyfactに対応しない余剰文の率、(4)指示遵守=出力形式・文字数・言語(日本語)遵守の二値チェック。『日本語の自然さ/流暢性』は独立レンズにしない(llm-jp-judgeで人手相関0.48、現代モデルでは飽和)。総合pairwise判定ではプロンプト冒頭にこの観点リストを固定列挙してから比較させる(PlanJudge式、表層バイアス緩和)。",
+    "出力形式: judgeには自由記述で判定理由(CoT)を書かせ、最後に『判定: [[A]] / [[B]] / [[tie]]』のタグを出させて正規表現で抽出する。llama.cppのjson_schema/GBNFで生成全体を縛らない(推論10–15%劣化)。パース失敗時のみ1回リトライし、それでも失敗ならその判定はtie扱いでログに残す。gpt-ossのanalysisチャネル(思考部)は捨ててfinalのみパース。",
+    "サンプリング: 基本はtemperature 0(greedy)+スワップ2オーダーで1ペア2生成。同一審判のtemperatureサンプリング多数決は誤りが相関しコスパが悪いので既定では使わず、採否がボーダーの比較のみ副審(異族)を加えた2審判×2オーダーに拡張する。",
+    "集計と統計: モデルA vs B のn記事について、consistent winのみを勝敗として両側二項符号検定(tieは除外、有効nの減少を必ず報告)。p<0.05かつ勝率≥60%を『スワップ推奨』の閾値とし、tie除外後のnが20未満なら『検出力不足・差なし』と報告する。副次指標として先頭位置勝率(raw position preference)を毎回ログし、0.5から大きく外れたら審判プロンプトの劣化を疑う。",
+    "メタ評価: 導入時に30–50記事の要約ペアへ人手ラベル(自分で可)を付け、審判との一致率(目安: 一致70%以上、Cohen's κ>0.4)を確認してからCIに組み込む。verbosity bias監視として『長い方の勝率』を常時集計し、6割を超えたら簡潔さレンズの重みを見直す。判定プロンプトはllm-jp-judgeの日本語プロンプト(理由先行+[[N]]記法、Apache-2.0)を下敷きにするとゼロから書くより安全。"
+  ]
+}

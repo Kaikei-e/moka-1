@@ -1,0 +1,39 @@
+{
+  "decision": "d2-gptoss-vs-q36",
+  "n_pairs": 3,
+  "pair_level_wins": {
+    "gptoss20b": 0,
+    "qwen36-35b": 3
+  },
+  "ties": 0,
+  "sign_test_p": 0.25,
+  "winner": "qwen36-35b",
+  "per_lens": {
+    "conciseness": {
+      "gptoss20b": 0,
+      "qwen36-35b": 1,
+      "tie": 2
+    },
+    "coverage": {
+      "gptoss20b": 0,
+      "qwen36-35b": 2,
+      "tie": 1
+    },
+    "faithfulness": {
+      "gptoss20b": 0,
+      "qwen36-35b": 2,
+      "tie": 1
+    },
+    "instruction": {
+      "gptoss20b": 0,
+      "qwen36-35b": 1,
+      "tie": 2
+    }
+  },
+  "position_consistency": 0.917,
+  "judge_agreement": null,
+  "judges": [
+    "claude"
+  ],
+  "created_at": "2026-07-03T00:33:27+00:00"
+}

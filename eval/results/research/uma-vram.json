@@ -1,0 +1,79 @@
+{
+  "summary": "HX370のUMA構成では、RADVはBIOS carve-outとGTTを合算して「疑似ヒープ」(合計の2/3をDEVICE_LOCAL、1/3をGTTとして申告)を報告し、さらにwinsysレベルでVRAM確保に常にGTTフォールバック(AMDGPU_GEM_DOMAIN_VRAM|GTT)を付けるため、実際のGPU使用可能量は「carve-out 48GiB + GTT 7.6GiB ≒ 55.6GiB」で決まり、carve-out超過は自動的にGTTへスピルする(性能はMesa自身が「APUではVRAMとGTTはほぼ同速」と明記)。したがって計43GiBの4-5モデル同時常駐は現構成で成立見込みが高いが、35B級2本の「両方常駐」(+20.8GB)は物理64GBを超え不可能。一方、Strix Halo/Point界隈の推奨は「carve-out最小+GTT大盛り(amdgpu.gttsize+ttm.pages_limit)」であり、48GB carve-outはホストRAM16GBを恒久的に奪い、21GB GGUFのページキャッシュ再利用不可・--no-mmap不可という運用上の実害を生むため、小carve-out+GTT≈48GBへの移行を検討する価値がある。Q5/Q6再検討は、unsloth実測でQ4_K_XL→Q5_K_XLがKLD -42%(0.41→0.24)・サイズ+12%・decode推定-10〜15%と割が良く、スワップ枠1本に限りQ5昇格の実測を推奨。",
+  "key_findings": [
+    {
+      "finding": "(1a) RADVはAPU(has_dedicated_vram=false、BIOS carve-outがあっても同じ)ではsysfsの実ヒープ構成を報告しない。「carve-out(visible VRAM)+GTT」の合計を計算し、その2/3をDEVICE_LOCALヒープ、1/3をGTTヒープとして『偽装』報告する(radv_physical_device_init_mem_types内コメント「On APUs, the carveout is usually too small for games... report 2/3 as VRAM and 1/3 as GTT」)。開発機の48GiB+7.6GiB≒55.6GiBなら、vulkaninfoは約37GiBのDEVICE_LOCAL+約18.5GiBのGTTを示すはず。ヒープサイズはデフォルトでは強制されない(VK_AMD_memory_overallocation_behaviorで明示的に禁止した場合のみ超過でOUT_OF_DEVICE_MEMORY)。budget(EXT_memory_budget)は実空き容量に応じて2ヒープへ再配分される。",
+      "confidence": "high",
+      "sources": [
+        "https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/amd/vulkan/radv_physical_device.c",
+        "https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/amd/vulkan/radv_device_memory.c"
+      ]
+    },
+    {
+      "finding": "(1b) スピルの実体: RADVのamdgpu winsysはDEVICE_LOCAL確保時にpreferred_heap = AMDGPU_GEM_DOMAIN_VRAM | GTT を常に指定する(RADV_PERFTEST=nogttspillで無効化可)。Mesaソース内コメントに「Since VRAM and GTT have almost the same performance on APUs」と明記。つまりcarve-out 48GiBが埋まると、カーネルが自動でGTT(7.6GiB)に配置し、両ドメインが尽きて初めてvkAllocateMemoryが失敗する。失敗時llama.cppは「ggml_vulkan: Device memory allocation of size N failed」でロード中断(ページ単位の遅いスワップではなく、確保単位のスピル→最終的にハードOOM)。APUではスピル先も同じLPDDR5Xなので速度劣化はほぼゼロ。劣化が起きるのはCPUフォールバックやNVMeスピル(別報告で13 t/s→5.6-6.6 t/s)の場合のみ。",
+      "confidence": "high",
+      "sources": [
+        "https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/amd/vulkan/winsys/amdgpu/radv_amdgpu_bo.c",
+        "https://github.com/geerlingguy/beowulf-ai-cluster/issues/2"
+      ]
+    },
+    {
+      "finding": "(1c) llama.cpp Vulkanバックエンドは iGPU(deviceType==IntegratedGpu → device->uma=true)では DEVICE_LOCAL|HOST_VISIBLE|HOST_COHERENT → DEVICE_LOCAL → HOST_VISIBLE|HOST_COHERENT の順でメモリタイプを試すフォールバック連鎖を持つ(ggml_vk_create_buffer_device)。空き/総量報告(ggml_backend_vk_get_device_memory)はiGPUでは全ヒープを合算するので、--n-gpu-layers自動fitは55.6GiB相当を見る。重みバッファはデフォルト1GiB単位のサブアロケーション(コメント「Limit batching of allocations to 1GB by default to avoid fragmentation issues」、GGML_VK_SUBALLOCATION_BLOCK_SIZEで変更可)なので断片化・巨大単一確保問題は構造的に回避されている。診断用envとして GGML_VK_MEMORY_LOGGER=1(全確保のサイズとメモリタイプをログ)、GGML_VK_PREFER_HOST_MEMORY(GTT優先)が使える。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-vulkan/ggml-vulkan.cpp"
+      ]
+    },
+    {
+      "finding": "(2) Strix Halo界隈の確立した推奨は『BIOS carve-out最小(512MB、BIOS下限なら2GB)+GTT大盛り』。カーネルパラメタ実例: amd_iommu=off amdgpu.gttsize=131072 ttm.pages_limit=31457280(128GB機で約120GBをGTT化)や amdgpu.gttsize=129024 ttm.pages_limit=33030144 ttm.page_pool_size=33030144。ttm系は4KiBページ単位。carve-outとGTTの速度差は測定上「機能的に等価」扱い(Mesaコメントとも整合)。同一CPU(HX370/96GB)の先行例では amdgpu.gttsize=40960 ttm.pages_limit=14680064 でQwen3-Next-80B Q8_0が~10.9 t/s動作。注意点: GTTヒープを64GiB超にするとVulkanヒープが分割されスタックする報告あり(開発機の64GB総量では非該当)。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/hogeheer499-commits/strix-halo-guide",
+        "https://github.com/ggml-org/llama.cpp/discussions/18839",
+        "https://github.com/ggml-org/llama.cpp/issues/19396",
+        "https://github.com/ollama/ollama/issues/15302"
+      ]
+    },
+    {
+      "finding": "(3) 複数常駐の実例: 128GB Strix Halo(8060S)で30-36GB級モデル2本の同時ロードが、GTT/TTMパラメタ設定後に安定動作した報告あり(設定前は『89GB空き』表示でも2本目がOOM——原因はカーネル側GTT上限であってVulkan断片化ではない)。llama.cppはプロセス間で重みを共有しない(read-only重み共有はDiscussion #21223で提案段階)ので、5インスタンス=5本分の実容量が必要。1GiBサブアロケーションのため断片化起因の失敗報告は見当たらず、失敗様式はロード時ハードOOMに集約される。43GiB/55.6GiBの常駐は容量的に成立するが、5プロセス分のKVキャッシュ+compute bufferの合計(モデルあたり数百MB〜1GiB超、コンテキスト長依存)を忘れずに計上する必要がある。",
+      "confidence": "medium",
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/discussions/18839",
+        "https://github.com/ggml-org/llama.cpp/discussions/21223",
+        "https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-vulkan/ggml-vulkan.cpp"
+      ]
+    },
+    {
+      "finding": "(4) Q5/Q6の品質対価(unsloth公式Qwen3.5ベンチ、2026-02-27公表): KLD(99.9%) Q4_K_M 0.548 / UD-Q4_K_XL 0.410 / Q5_K_XL 0.236 / Q6_K_S 0.223 / Q8_K_XL 0.103。サイズは 18.5 / 19.2 / 23.2 / 26.6 / 36.0 GB。つまりQ4_K_XL→Q5_K_XLでKLD -42%(サイズ+21%)、Q5→Q6は僅差(0.236→0.223)でサイズ+15%と割が悪い。perplexityは全量子で6.5-6.6とフラット(unsloth自身が「PPL/KLDは較正依存で誤解を招く」と注記)。速度面: decodeは帯域律速でアクティブ重みバイト数にほぼ比例。A3B MoEはアクティブ~3Bのみ読むため、Q4_K_XL(~4.8bpw)→Q5_K_XL(~5.5bpw)でdecode -10〜15%(23→~20 t/s)、Q6で-25%前後(~17 t/s)と推定。8060S実測でもQwen3.6-35BはQ4_0 81.3 t/s vs UD-Q4_K_M 62.6 t/sとサイズ比例の劣化を確認。",
+      "confidence": "medium",
+      "sources": [
+        "https://unsloth.ai/docs/models/qwen3.5/gguf-benchmarks",
+        "https://github.com/hogeheer499-commits/strix-halo-guide",
+        "https://github.com/ggml-org/llama.cpp/discussions/10879"
+      ]
+    },
+    {
+      "finding": "(5) mmap/--no-mmapの挙動: --no-mmapはGPU行き層も一旦ホストRAMにステージするため、21GB GGUF > 16GBホストRAMでは失敗またはスワップ地獄になる(Issue #9059: モデル>RAMで--no-mmapは『クラッシュか極端な劣化』、mmapなしで150GB/128GB機は0.02 t/s)。デフォルトのmmapならページはVulkanステージング経由でアップロード後に回収可能なので21GBロード自体は成立するが、16GBホストRAMではファイル全体をページキャッシュに保持できず、再起動のたびにNVMeからフル再読込(キャッシュ再利用ゼロ)。ロード時間はディスク逐次読み速度で律速。48GB carve-out構成の運用上の最大の実害はこれ+Docker/Postgres/ビルドとの16GB取り合い。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/issues/9059",
+        "https://github.com/ggml-org/llama.cpp/discussions/19883"
+      ]
+    },
+    {
+      "finding": "(補) RADVにはdriconfオプション radv_enable_unified_heap_on_apu(デフォルトfalse、radv_drirc_gen.pyで定義)があり、有効化するとAPUで全メモリを単一DEVICE_LOCALヒープとして報告する。llama.cppのfit計算を素直にしたい場合の実験ノブになる。また8060S実測でLFM2.5-8B Q4_K_Mが170 t/s(帯域~256GB/s)であり、開発機の69.5 t/s(~120GB/s)は帯域比でほぼ理論通り——現行pinの数値は健全で、帯域律速前提の見積りが有効であることの傍証。",
+      "confidence": "medium",
+      "sources": [
+        "https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/amd/vulkan/radv_drirc_gen.py",
+        "https://github.com/hogeheer499-commits/strix-halo-guide"
+      ]
+    }
+  ],
+  "recommendations": [
+    "(a) VRAM実プローブ手順: (0)ベースライン採取 — vulkaninfoのmemoryHeaps(『2/3偽装』の実値=DEVICE_LOCAL~37GiB+GTT~18.5GiBを確認)、/sys/class/drm/card*/device/mem_info_{vram,gtt}_{total,used}。(1)各serverを単独起動×GGML_VK_MEMORY_LOGGER=1で、全バッファの配置メモリタイプ(DEVICE_LOCAL vs HOST_VISIBLE)とサイズを記録し、llama-benchでpp512/tg128の単独基準値を取る。(2)常駐計画順に大きいモデルから順次起動し、各段階でmem_info_vram_used/gtt_used、dmesg(TTM eviction/amdgpuエラー)、既起動インスタンスのtg再測(evict起因の劣化検知)を記録。(3)最後に意図的にもう1本載せて55.6GiB超過時の挙動(GTTスピル→ハードOOMの境界)と、GTTに落ちたインスタンスのt/s(理論上ほぼ同速のはず)を実測。(4)server再起動を2回連続で行いロード時間を比較(16GBホストRAMでのページキャッシュ無効を定量化)。",
+    "(b) 「両方常駐」(35B級2本同時)は不可と判断してよい: 現行常駐~43GiBに20.8GBを足すと~64GiBでGPU実使用可能量(carve-out48+GTT7.6=55.6GiB)も物理64GBも超える。スワップ枠は排他運用(llama-swap等でのオンデマンド切替)を維持。ただし切替コストは16GBホストRAMではページキャッシュが効かずNVMeフル読込になる点をSLOに織り込む。4-5本・計43GiBの同時常駐自体は、KV/computeバッファ込みで~48GiB以内に収まる限り成立見込みが高い(先行事例: 128GB機で30-36GB級2本安定)。",
+    "(c) Q5/Q6再検討: 『Q4縛り』はスワップ枠1本に限り緩和する価値あり。unsloth実測でUD-Q4_K_XL→Q5_K_XLはKLD -42%(0.410→0.236)に対しサイズ+2.4GB(20.8→23.2GB)・decode推定-10〜15%(~23→~20 t/s)で費用対効果が良い。Q5→Q6はKLD改善が僅か(0.236→0.223)でサイズ+3.4GB・さらに-10%減速するため非推奨。常駐4本(LFM2.5/4B/E4B/gpt-oss-20b)は応答速度が価値なのでQ4維持。実施時はllama-benchでtg128を実測し、20 t/s(日本語要約の許容ライン)を割るならQ4へ戻す、という受け入れ基準で。",
+    "(d) カーネル/起動設定の変更提案(中期): BIOS carve-outを最小(512MB〜4GB)に戻し、amdgpu.gttsize=49152 ttm.pages_limit=12582912 ttm.page_pool_size=12582912(=48GiB、4KiBページ単位)でGTT大盛りに移行することを推奨。根拠: (i)Mesaソース自身が「APUではVRAMとGTTはほぼ同速」と明記し、Strix Halo界隈の標準構成(512MB+gttsize/ttm)で100 t/s級の実績、(ii)GTTは使った分しかホストから奪わないため、ホスト可用RAMが実質~16GB→最大60GB化し、21GB GGUFのページキャッシュ再利用(モデルスワップの高速化)とスワップ逼迫の解消が得られる、(iii)GPU使用可能量は48+α GiBで現行と同等。注意: GTTヒープは64GiB未満に留める(Vulkanヒープ分割バグ回避)。amd_iommu=offはNPU(XDNA)を将来使うなら保留。移行前に(a)のプローブを現構成で完走させ、移行後に同一手順で差分を取ってADR化するのが安全。",
+    "(e) 運用ノブのメモ: --no-mmapは現16GBホストRAM構成では21GBモデルに対して使用禁止(mmapデフォルト維持)。診断にはGGML_VK_MEMORY_LOGGER=1、挙動実験にはGGML_VK_PREFER_HOST_MEMORY(全部GTT化)とradv_enable_unified_heap_on_apu=true(単一ヒープ報告)が使える。断片化対策は既定の1GiBサブアロケーションで足りるため追加設定不要。"
+  ]
+}

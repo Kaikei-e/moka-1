@@ -1,0 +1,212 @@
+[
+  {
+    "pair_id": "summarize:art-000",
+    "article_id": "art-000",
+    "task": "summarize",
+    "text_a": "Microsoft announced the public release of “Coreutils for Windows” and introduced the “WSL containers” feature, while Apple released a new macOS function called “Container machine” that integrates Linux containers. Further highlights include Ubuntu’s sandboxed development environment via “Workshop”, Microsoft’s launch of seven AI models, Azure’s preview of the “Azure Linux 4.0” distribution (optimized for Azure and also usable with WSL), the general availability of Windows Development Skills, Deno 2.9 with faster startup and halved memory consumption, GitLab’s “Project Switch” source‑code service, and Microsoft’s introduction of customizable isolation environments named “Microsoft Execution Containers”. These announcements underscore the continued effort to embed Linux development tools and AI capabilities directly into Windows and macOS ecosystems.",
+    "text_b": "マイクロソフトは「Coreutils for Windows」を一般公開し、UNIX 系コマンドを Windows に移植した。同社また「WSL containers」を発表し、Windows 上で Linux コンテナの作成や実行が可能にすることで Linux 開発環境の統合を進めている。Apple は macOS 上に Linux コンテナを統合する新機能「Container machine」のバージョン 1.0 をリリースした。"
+  },
+  {
+    "pair_id": "summarize:art-001",
+    "article_id": "art-001",
+    "task": "summarize",
+    "text_a": "Linux Foundation announced its intention to launch the Agent Name Service (ANS), an open‑source standard that provides trustworthy identifiers for AI agents based on DNS. The service aims to establish a decentralized identity layer over existing DNS and also supports Distributed Identity (DID) and Legal Entity Identifier (LEI) to integrate with existing identity systems and verify authenticity, provenance, and governance of AI agents. The announcement was welcomed by multiple parties, including Cloudflare, Cisco, and Salesforce.",
+    "text_b": "Linux Foundation が、既存の DNS 基盤を拡張し、AI エージェントに信頼できる識別子を提供するオープンソース標準「Agent Name Service（ANS）」の立ち上げ意向を発表しました。この標準は、AI エージェントの身元確認、認証、信頼、ガバナンス、相互運用性の課題を解決し、どの組織や人物が提供するエージェントか、あるいは生成コードの履歴を検証可能にすることを目指しています。また、ANS は分散型識別子（DID）や取引主体識別コード（LEI）もサポートし、既存のアイデンティティシステムとの統合を可能にします。Cloudflare やシスコ、セールスフォースなどの関係者から賛意が得られています。"
+  },
+  {
+    "pair_id": "summarize:art-002",
+    "article_id": "art-002",
+    "task": "summarize",
+    "text_a": "Astro 7.0 が正式リリースされ、ビルドシステムが Vite 8 と Rust 製コンパイラ「Rolldown」に更新されました。これにより、従来の Go や WebAssembly ベースのコンパイラから Rust 製コンパイラへの移行が行われ、ビルド速度が 15％から最大 61％高速化されました。Astro 7.0 では、開発時用の高速バンドラとして esbuild、本番用的高機能バンドラとして Rollup が採用されていた Vite の構成が、Rust の「Rolldown」に統一されました。また、Astro と Vite は 2026 年 1 月と 6 月にそれぞれ Cloudflare に買収されており、社内ツールとして連携強化が進んでいます。",
+    "text_b": "Astro 7.0 が正式版としてリリースされ、ビルドシステムに Vite 8 と Rust製高速バンドラ「Rolldown」を採用した。Rustコンパイラをビルドシステムとして導入したことで、従来比最大 61 %のビルド時間短縮が実現した。Astro は React、Vue、Svelte、Alpine.js、TypeScript などのフレームワークやライブラリに対応するオープンソースの静的サイトジェネレータである。Astro と Vite はともに Cloudflare の傘下にある。"
+  },
+  {
+    "pair_id": "summarize:art-003",
+    "article_id": "art-003",
+    "task": "summarize",
+    "text_a": "Googleのサービスを利用するユーザーのうち、IPv6を使用している割合は、2026年3月28日に初めて50%を超え、現時点での最大値は6月13日の50.29%であった。APNICの測定では世界全体のIPv6利用率は42%であり、この数値差はGoogleが広告効果最適化のために配信先を偏らせた影響を除外するため、独自の重み付けを適用した結果であると説明している。日本では2025年4月に初めて50%を超え、さらに1年前の2024年4月にも同閾値に達していた。",
+    "text_b": "Google のサービスを利用するユーザーのうち、IPv6 の利用割合は 2026 年 3 月に 50％を超え、6 月には 50.29％に達した。APNIC の独自調査では世界全体の IPv6 利用率が 42％と報告されており、Google の数値との差は測定対象や重み付けの異なるためである。日本国内では 2024 年 4 月に IPv6 の利用率が 50％を超え、アジア太平洋地域全体では 2025 年 4 月にその目標を達成した。"
+  },
+  {
+    "pair_id": "summarize:art-004",
+    "article_id": "art-004",
+    "task": "summarize",
+    "text_a": "マイクロソフトは「WSL Containers」のパブリックプレビューを公開し、WSL でコンテナ型仮想化を利用可能にした。\n今回の改善により、新しいデフォルトファイルシステム「virtiofs」の導入で Windows ファイルへのアクセスが 2 倍高速になった。\nまた、新たなデフォルトネットワークモード「consomme」で Windows アプリケーションと同じネットワーク環境やセキュリティポリシーを受けられるようにした。",
+    "text_b": "Microsoftは、Windows上でLinuxコンテナを実行できる「WSL Containers」をパブリックプレビューとして公開した。今回のプレビューでは、デフォルトファイルシステムとして「virtiofs」が導入され、Windowsファイルへのアクセスが2倍高速化された。また、「consomme」ネットワークモードやメモリ回収技術の改善も行われ、これらは現在WSL Containersで有効だが、今後はWSL全体でデフォルト機能として提供される予定である。"
+  },
+  {
+    "pair_id": "summarize:art-005",
+    "article_id": "art-005",
+    "task": "summarize",
+    "text_a": "クアルコムは、AI処理の高速化を目指すPythonライクな新言語「Mojo」を開発するModular社を買収した。MojoはCPU・GPU・NPUなどのハードウェアを高度に抽象化し、既存のPythonコードから移植することで従来比で大幅に高速なAI処理を実現する言語である。ベータ版は2026年5月に公開され、2026年秋にはオープンソースとして公開される予定である。今回の買収は、クアルコムが2026年に発表したAIデータセンター向けCPU「Dragonfly」への参入を後押しする戦略の一環であり、ソフトウェア基盤の提供を強化するものと見なされている。Mojoは今後、AppleのSwiftやJetBrainsのKotlinに倣い、オープンソースで多くの開発者の関心を集める主要なソフトウェアプラットフォームとして位置づけられる。",
+    "text_b": "クアルコムは、AI処理の高速化を目指すPythonライクな新言語「Mojo」の開発元であるModular社を買収しました。\nModular社には、LLVMやSwiftの開発に関わったChris Lattner氏が共同創業者兼CEOを務めています。\nMojoはPythonのコードを移植することで、CPU、GPU、NPUなどを高度に抽象化し、AI処理を高速化します。\n同社は今年秋にMojoのオープンソース化を予定しており、この買収はAIデータセンター市場への本格参入の一環として見られます。"
+  },
+  {
+    "pair_id": "summarize:art-006",
+    "article_id": "art-006",
+    "task": "summarize",
+    "text_a": "DenoはJavaScriptおよびTypeScriptを実行するランタイムであり、2.9版では起動が2倍速、消費メモリは半分に削減された。  \nDeno Desktopは、WebView（WindowsではWebView2、macOS・LinuxではWebKit）を用いて、JavaScript/TypeScriptで構築したWebアプリケーションを、Windows、macOS、Linuxのデスクトップアプリとして直接実行できるコマンドである。  \nまた、本リリースではmin-release-ageのデフォルト化、CSSインポート、npm/pnpm/yarn/bunロックファイルのサポート、deno link/unlink、コンテンツを束縛するbundleがd.tsファイルに集約される機能が追加された。",
+    "text_b": "Deno 2.9 は起動速度を最大で 2 倍に、メモリ使用量を 2 分の 1 から 3 分の 1 に削減した。\n同バージョンでは WebView を用いた「Deno Desktop」コマンドが追加され、Windows や macOS、Linux 上で Web テクノロジーを用いたスタンドアロンなデスクトップアプリを実行可能となった。\nまた、デフォルトで最小リリース年齢が設定され、npm や pnpm のロックファイルのインポート、CSS のインポート、そして bundle 時に roll-up された d.ts 出力など、多くの機能改善が実施された。"
+  },
+  {
+    "pair_id": "summarize:art-007",
+    "article_id": "art-007",
+    "task": "summarize",
+    "text_a": "AWS Lambda MicroVMs は、Firecracker を採用しカーネルレベルで分離されたステートフルな実行環境を提供する新サービスです。最大 8 時間のステートを維持し、アイドル状態でもメモリやディスクの内容を保持することで、トラフィックが到着すれば瞬時にセッションを再開できます。また、Dockerfile と Amazon S3 を用いてイメージを管理可能であり、ARM64 アーキテクチャに対応するプロセッサで 1 つあたり最大 16 vCPU と 32GB メモリを備えています。",
+    "text_b": "AWS Lambdaはサーバレス実行環境を提供し、MicroVMsによりステートフルかつ隔離された一時的な実行環境を安全に提供する新サービス「AWS Lambda Micro VMs」を発表した。MicroVMsはFirecrackerベースのマイクロVMで、最大8時間のステート保持が可能で、アイドル状態でもメモリとディスクの内容が保持され、トラフィック到着時に即座にセッションを再開できる。DockerfileやAmazon S3パッケージによるイメージ管理で、ARM64アーキテクチャ、最大16 vCPU・32GBメモリ・32GBディスクを備え、東京リージョンおよび米国東部（ノースバージニア、オハイオ）、米国西部（オレゴン）、ヨーロッパ（アイルランド）で利用可能である。ステートを永続的に維持するものではなく、短期的なワークロード向けに設計されており、プロビジョニングや管理をサーバに任せられる利点を維持している。"
+  },
+  {
+    "pair_id": "summarize:art-008",
+    "article_id": "art-008",
+    "task": "summarize",
+    "text_a": "Microsoft announced the release candidate of TypeScript 7.0, the first version compiled with Go, which compiles ten times faster than previous versions and supports larger codebases. The new release includes a native port based on Go, enabling parallel processing, and LSP support through a native binary service. It is already being used by Microsoft’s internal teams and external partners such as Google, Notion, Slack, and Vercel, which have reported positive feedback.",
+    "text_b": "マイクロソフトは、TypeScript コンパイラを Go 言語に移植した「TypeScript 7.0」リリース候補版を発表しました。\nコンパイル速度が従来の 10 倍に高速化され、大規模なコードベースにも対応するスケーラビリティが実現しています。\nLanguage Server Protocol (LSP) に対応したランゲージサービスも Go 言語でネイティブ化され、快適な実行が可能となりました。\nGoogle や Notion、Slack、Vercel などの企業で既に利用が始まり、ポジティブな評価を得ています。"
+  },
+  {
+    "pair_id": "summarize:art-009",
+    "article_id": "art-009",
+    "task": "summarize",
+    "text_a": "GitHubは、リポジトリへの書き込み権限を持たないユーザーのプルリクエスト数上限を設定できる新機能を導入した。制限に達したユーザーは、上限に達したプルリクエストが閉じられるかマージされるまで、次の提出をブロックされる。信頼できるコントリビュータはバイパスリストに登録することで制限から除外できる。この機能は、AIによるコード生成やバグ発見が普及したことで増加した大量の低品質プルリクエストを抑制するためのものとされている。",
+    "text_b": "GitHub は生成 AI による大量の雑なプルリクエストを抑制するため、ユーザー当たりの提出上限を設定できる新機能を発表した。この機能は、書き込み権限のないユーザーの提出数を制限し、上限に達した者は既存のプルリクエストが閉じたりマージされたりするまで新しい提出ができなくなる仕組みである。信頼できるコントリビュータはバイパスリストに登録することで上限から除外でき、外部からのプルリクエストを受けつつも質をコントロールするものである。GitHub はさらに低品質なプルリクエストをアーカイブ機能で一般から隠すことや、イシュー（バグ報告など）にも同様の上限機能を提供する予定としている。"
+  },
+  {
+    "pair_id": "summarize:art-010",
+    "article_id": "art-010",
+    "task": "summarize",
+    "text_a": "AWSは、コード、インフラ構成、アクセス許可、ネットワークトポロジー、ビジネス上の優先事項やドキュメントなどの非構造化データも考慮し、特定のAIモデルに依存しない「AWS Continuum」を発表した。  \n既存の「AWS Security Agent」は「AWS Continuum for penetration testing」および「AWS Continuum for code scanning」として統合され、プレビューで「Continuum for threat modeling（STRIDE形式）」も提供開始された。  \n同サービスは包括的な脆弱性スキャンを実行し、影響を受けるコンポーネントの部署状況や本番環境への露出度、ビジネスへの影響を評価した上で優先順位付けを行い、サンドボックスで誤検出を確認し、既存の防御策との比較やパッチ適用・ネットワーク変更・ポリシー変更などの緩和策を提示する。",
+    "text_b": "AWS は、コードスキャンだけでなくインフラ構成やビジネス文書などの非構造化データを文脈として活用し、脆弱性と攻撃経路を包括的に把握する新サービス「AWS Continuum for code vulnerabilities」を発表しました。\nこのサービスは、サンドボックス環境で攻撃を再現し再現性を証明するだけでなく、コードパッチやネットワーク変更などの具体的な緩和策を提案します。\nまた、AWS Continuum は特定の AI モデルに依存しない設計となっており、複数の最新 AI モデルを組み合わせながら、高性能なモデルが登場すれば自動的に取り込む仕組みとなっています。"
+  },
+  {
+    "pair_id": "summarize:art-011",
+    "article_id": "art-011",
+    "task": "summarize",
+    "text_a": "AWSは、コードリポジトリを継続的に自動スキャンし、サポート終了したライブラリやフレームワークなどの技術的負債を検出し、優先順位を付けて報告または修正のためのプルリクエストを提案する「AWS Transform – continuous modernization」のプレビュー公開を発表しました。  \nこのサービスはAIエージェントによってコードを分析・評価し、リファクタリングや依存関係のマッピング、変換を実行します。  \n検出されたコードに対し、優先順位付きリストの作成だけでなく、修復用のプルリクエストも自動生成できます。  \nまた、AWS Security Agentと統合されており、ソースコードレベルでの脆弱性検出・修正も可能です。  \n技術的負債の継続的な早期発見が可能になり、より計画的な対応が期待されています。",
+    "text_b": "AWS は、AI エージェントがコードリポジトリを継続的に自動スキャンし、サポートが終了したライブラリやフレームワークなどの技術的負債を検出・優先順位付けする「AWS Transform – continuous modernization」のプレビューを公開した。組織固有のルールを拡張して検出ポリシーをカスタマイズし、検出されたコードに対して修復用のプルリクエストを自動生成する機能も備える。また、AWS Security Agent と統合されているため、ソースコードレベルでの脆弱性検出・修正も可能である。"
+  },
+  {
+    "pair_id": "summarize:art-012",
+    "article_id": "art-012",
+    "task": "summarize",
+    "text_a": "中国企業のZ.aiは、クローズドモデルだけでなく、AnthropicのClaude Opus 4.8やOpenAIのGPTなどのオープンAIモデルも活用可能な高性能AIモデルGLM‑5.2を公開した。同社が開発するAIエージェントアプリ「ZCode」は、GLM‑5.2に最適化されており、コード生成や単一アプリ上でのコードチェックが可能である。ZCodeはMCPサーバーやSkillsへの対応、リモートコントロール機能（WeChatやTelegram経由）も提供し、ドキュメントはhttps://zcode.z.ai/en/docs/welcomeで確認できる。",
+    "text_b": "中国企業の Z.ai が開発した AI エージェントアプリ「ZCode」は、自社が開発したオープンモデル「GLM-5.2」に最適化されています。ZCode は Claude Code や Codex と同様にコード生成やチェック機能を提供し、Anthropic や OpenAI のモデルも利用可能です。さらに MCP サーバーやスキルに対応しており、WeChat や Telegram からのリモートコントロールも可能となっています。"
+  },
+  {
+    "pair_id": "summarize:art-013",
+    "article_id": "art-013",
+    "task": "summarize",
+    "text_a": "Godot は AI 生成コードによるプルリクエストを受け付けることを停止し、コード作成は人間によって行うことを義務付ける方針を決定しました。この判断は、AI を多用するユーザーが自身のコードを十分に理解しておらず、エラー修正が困難になるためです。これにより、新規コントリビューターはバグ修正やドキュメント作成など単純な作業から始め、メンテナーとの信頼関係を築いてから大規模なリファクタリングに取り組むことが求められます。",
+    "text_b": "Godot announced it will no longer accept pull requests authored by AI because the foundation cannot trust heavy AI users to understand and modify their code sufficiently. All future contributions must be created entirely by humans, with any AI use limited to simple tasks that must be disclosed in discussion, and human‑to‑human communication cannot contain AI‑generated text. The foundation will keep a conservative stance on AI tools but will continue to review changes as the situation evolves."
+  },
+  {
+    "pair_id": "summarize:art-014",
+    "article_id": "art-014",
+    "task": "summarize",
+    "text_a": "Belkinの「Nintendo Switch 2用 USB‑C to USB‑C ケーブル 60W」は、LTT Labs の調査によれば、充電速度は最大約15 W に制限されており、60 W での急速充電を実現しないことが実証された。同ラボは、Belkin BoostCharge（240 W対応）や UGreen の USB‑C ケーブルを含む複数のケーブルでテストを行い、いずれも 5～10 % 残電状態で最大15 W 前後に頭打ちであった。さらに、0 % から 100 % へのフル充電テストでも出力は 15 W 前後に留まり、60 W からの急速充電は不可能であることが明らかになった。LTT Labs は、Nintendo Switch 2 の USB‑C ポートが独自仕様を採用しているため、サードパーティ製アクセサリーの排除という戦略的怠慢を指摘しつつ、本ケーブルの性能限界はデバイスのハードウェア設計によるものと結論付けている。",
+    "text_b": "Belkin 製「Nintendo Switch 2 用 USB-C to USB-C ケーブル 60W」は 60W 充電に対応しているが、実際には Nintendo Switch 2 の USB-C ポートの仕様により最大 15W 程度しか出力されず、60W 充電は実現できず。LTT Labs のテスト結果では、このケーブルや他の高電力ケーブルを使用しても充電速度に大きな違いはなく、純正ケーブルと同様に 15W で充電されることを確認した。したがって、Nintendo Switch 2 用の特別な高電力 USB-C ケーブルは必要ないと結論付けられている。"
+  },
+  {
+    "pair_id": "summarize:art-015",
+    "article_id": "art-015",
+    "task": "summarize",
+    "text_a": "明星 中華三昧カップ 四川飯店 汁なし四川麻辣麺は2026年6月29日に発売された。辛さレベルは5段階中3と評価され、ピリ辛な辛さと弱めの麻の感覚が特徴で、ほとんどの人が楽しめる程度だった。原材料には豚脂やみそ、豆板醤などの成分が含まれ、細めのノンフライ麺に後入れ液体ソースとふりかけを加えて仕上げられた。税別価格は358円で、Amazonでは12個セットが1個あたり372円で販売されている。関連記事として、辛め魚まぜそばや麻辣湯などの試食レビューが紹介されている。",
+    "text_b": "2026 年 6 月 29 日に発売される「明星 中華三昧カップ 四川飯店 汁なし四川麻辣麺」の辛さレベルは 5 段階中の 3 です。原材料には豆板醤や甜麺醤が含まれており、1 食あたりのカロリーは 481 カロリー、食塩相当量は 5.3 グラムです。麺は細めのノンフライ麺で、調理後にはピリ辛の「辣」が感じられますが、シビれる辛さの「麻」は弱めです。希望小売価格は税別 358 円で、Amazon.co.jp では 12 個セットが税込 4464 円で入手可能です。"
+  },
+  {
+    "pair_id": "summarize:art-016",
+    "article_id": "art-016",
+    "task": "summarize",
+    "text_a": "アリババとAUSマーチャントサービスは、違法医薬品や規制薬物の販売を防げなかったとして司法省から申し立てを受け、和解案で合計6億ドルを支払うことに合意した。両社は2016年から2024年にかけて、約8万点の違反商品販売阻止に失敗したことを認め、罰金と没収を含めた責任を認めた。この和解は、両社の誠実な取り組みや連邦機関への協力姿勢に基づくものであり、違法医薬品の流通経路を断つ結果となった。",
+    "text_b": "中国の大手IT企業アリババは、Alibaba.comおよびAliExpress.comで違法医薬品や規制薬物が販売されたことを認め、米国司法省（DOJ）からの訴訟に対し、合計6億ドル（約973億円）を支払う和解案に合意した。アリババの子会社であるAUS Merchant Services（旧アリペイUS）は、同社の決済処理システムの限界から高リスク取引や複数名義の請求書を監視できず、違法商品の販売や資金流出を許容したことを認めた。両社は、この合意に加え、コンプライアンス体制の強化と捜査への継続的な協力を約束し、これが和解の要因となった。"
+  },
+  {
+    "pair_id": "summarize:art-017",
+    "article_id": "art-017",
+    "task": "summarize",
+    "text_a": "GitHub Copilot が Visual Studio Code 内でブラウザ操作ツールを一般提供し、AI エージェントがウェブアプリを開き、リンクをクリックや文字入力、スクリーンショット撮影などを実行できる機能を強化した。この機能は標準で有効となり、DevTools の併用も可能で、ページ内容の読み取りやコンソールエラー取得にも対応している。セキュリティ対策として、ユーザーが開いたタブは AI エージェントが自動的に操作できず、AI が開いたタブは別のセッションで動作し、保存済み Cookie にはアクセスできない。",
+    "text_b": "GitHub Copilot now includes a browser‑operation tool for VS Code that lets the AI agent open a web application, perform actions such as navigating pages, clicking links, typing and reading content, and capture screenshots or console output. The feature is generally available after updating VS Code and can be invoked from the editor screen or the Agents window; it does not grant access to previously opened tabs or saved cookies unless the user explicitly shares them with the agent. For enterprise users, administrators can enable or disable the tool globally and restrict which domains the agent may access. In parallel, GitHub announced that Copilot CLI and SDK now support setting AI‑credit session limits via the “/limits” command or the “--max-ai-credits” flag."
+  },
+  {
+    "pair_id": "summarize:art-018",
+    "article_id": "art-018",
+    "task": "summarize",
+    "text_a": "ミネソタ大学の研究チームが、非生物材料からゼロに構築された人工細胞「SpudCell」を開発し、成長と分裂を成功させました。この細胞は、外部から栄養を摂取して増殖し、DNAを複製し、分裂する基本的な生命サイクルを実証しました。しかし、機械的な分裂によりゲノムが完全に分離しないため、分裂回数が限られ、リボソームの劣化対策も欠如しています。",
+    "text_b": "ミネソタ大学の研究チームは、非生物的な材料から作られた人工細胞「SpudCell」を、細胞分裂サイクルを完全に実行できるように開発した。リポソーム内にDNA複製システムとPURE systemによるタンパク質合成系を組み合わせ、外部から栄養を供給して成長し、DNAを複製・分裂させる機能を持たせた。5回の分裂後に完全なゲノムが保持できなくなることや、リボソームの劣化・新規合成の不在などの課題はあるが、改良により成長速度が向上した。将来的にはバイオ燃料や医薬品などの新材料作成への応用が期待されている。"
+  },
+  {
+    "pair_id": "summarize:art-019",
+    "article_id": "art-019",
+    "task": "summarize",
+    "text_a": "AppleはエントリーレベルのMacBook Proのデザイン変更を計画しており、2027年上半期に新モデルが発売される可能性がある。  \n同時に、Appleは2026年末から2027年初頭にかけて発売予定の新しいiPad Pro（11インチ・13インチ）を開発中であり、これらの製品は早ければ2027年春頃に発売されると予想されている。  \nまた、供給不足のためMacBook Proの大幅なモデル変更はわずかに遅れる可能性があるとも報じられている。",
+    "text_b": "Bloomberg によると、Apple はエントリーレベルの MacBook Pro のデザインを一新し、2027 年前半に発売する計画です。この新デザインは、2026 年末から 2027 年初めにかけて発表されるタッチスクリーン搭載 MacBook とは異なるデザインにすると報じられています。また、Apple は数カ月前に M7 搭載の新型 MacBook Pro のアップグレード作業を終えたことが確認されています。"
+  },
+  {
+    "pair_id": "summarize:art-020",
+    "article_id": "art-020",
+    "task": "summarize",
+    "text_a": "気象庁は7月2日に、7月8日と9日以降、近畿・北海道・東北・北陸・東海地方で「かなりの高温」になる見込みであることを発表しました。その中で北陸地方は平年より2.7℃以上、近畿地方は2.3℃以上高温になる予想とされています。",
+    "text_b": "MBSニュース気象庁は7月2日、近畿・北海道・東北・北陸・東海地方で8月8日以降「かなりの高温」かを発表した。また、九州国際大学付属高校野球部員が暴行容疑で書類送検され、長野・飯田市のクリーンセンター運営会社に対し被害者や関係者に説明を求める文書が送られた。東京地裁は俳優篠山輝信の出演料返還訴訟で事務所側に約200万円の支払いを命じ、北区小学校火災では家庭科室で洗濯した私服を音楽準備室で乾かしていたとして校長が謝罪した。"
+  },
+  {
+    "pair_id": "summarize:art-021",
+    "article_id": "art-021",
+    "task": "summarize",
+    "text_a": "WHO declared convergence on the hantavirus outbreak on the cruise ship MV Hondeus after health monitoring ended with no new cases. The United States reported that June employment rose by more than 5.7 million, missing market forecasts. A landowner was served documents in a lawsuit over alleged violent assault, gave no explanation, and left a concrete waste pit at a clean‑center operated by the South Shin State Union of Nagano and Iida cities. An actor was ordered to pay about 2 million yen for a disputed appearance fee. The principal of a Tokyo elementary school apologized after a teacher washed private clothing in a home department room, then dried it in a music preparation room.",
+    "text_b": "世界保健機関のテドロス事務局長は、大西洋を航行中のクルーズ船「MVホンディウス」でのハンタウイルス集団感染について収束を宣言した。乗客らの健康観察期間が終了し、新たな症例は確認されていないとされた。"
+  },
+  {
+    "pair_id": "summarize:art-022",
+    "article_id": "art-022",
+    "task": "summarize",
+    "text_a": "タイ東北部で、巡礼中の僧侶らの列に突っ込んだ車により9人が死亡し、20人が負傷しました。\nこの事故では、車を運転していたのは11歳の少年でした。",
+    "text_b": "タイ東北部で、巡礼中の僧侶の列に車が突っ込み、9人が死亡し約20人が負傷した。運転していたのは11歳の少年だった。米6月の雇用統計は予想を大きく上回る形で5万7千人以上の増収を示した。九州国際大学付属高校野球部員が暴行容疑で書類送検された。俳優・篠山輝信さんが出演料返還訴訟で、東京地裁から約200万円の支払い命令を受けた。北区の小学校の音楽準備室で、教員が私服を洗濯した後に火災が発生し、校長が不適切であったと謝罪した。"
+  },
+  {
+    "pair_id": "summarize:art-023",
+    "article_id": "art-023",
+    "task": "summarize",
+    "text_a": "ブルボン菓子2万袋の自主回収に関する話題とともに、経済分野では給付金案に対する家庭の反応や、深夜高速道路での宿泊違反指摘、月額150万円超の年金受給時の課税変更についての議論が取り上げられた。女性の厚生年金については、50歳で月額15万円超は1割となる内容が紹介された。さらに、7月支給の賞与を退職者に支払わないという上司の指示があり、就業規則に記載があれば問題ないことが明かされた。",
+    "text_b": "ブルボンが製造した菓子 2 万袋を自主回収する。"
+  },
+  {
+    "pair_id": "summarize:art-024",
+    "article_id": "art-024",
+    "task": "summarize",
+    "text_a": "スポニチアネックステレビ東京は2日、テレビ東京の深夜番組『※女性は見ないでください』の炎上について言及し、「真摯に受け止めている」と述べた。米6月雇用統計は市場予想を大きく下回る5万7,000人増加が発表された。同局は九州国際大学付属高校野球部員の暴行容疑による書類送検、東京北区小学校の火災で音楽教員が校舎の音楽準備室で私服を乾かした件、俳優篠山輝信の出演料返還訴訟で裁判所が支払い命令を出した事例についても言及した。",
+    "text_b": "スポニチは東京・六本木で定例会見を行い、6 月 8 日に放送開始された「※女性は見ないでください」の「炎上」問題について言及した。同局は「真摯に受け止めている」と表明した。"
+  },
+  {
+    "pair_id": "summarize:art-025",
+    "article_id": "art-025",
+    "task": "summarize",
+    "text_a": "56歳の女性が、両足の「ピン・アス」感覚から始まり両脚、さらに両手へと広がる神経症状を呈し、入院した。  \n彼女は高血圧、不安・うつ病、甲状腺機能低下症の既往があり、4週間前に甲状腺ホルモン剤の用量が強めに変更されたが、すぐに異常は検出されなかった。  \n20年前の交通事故で得た人工股関節は10年後に故障し、昨年には股関節の脱臼が起こってから約3ヶ月にわたって症状が続いている。",
+    "text_b": "56 歳の女性が車禍後の股関節置換術を 20 年前に受けたが、手術から 19 年後に関節内衬が破損し再手術を受けた。再手術から 3 ヶ月前から進行する神経症状、認知機能低下、心拍不整など多様な症状を発症し入院した。同症例は米国医科学誌《ニューイングランド・ジャーナル・オブ・メディシン》で報告されており、原因は股関節置換術から放出されたコバルトによる中毒である。"
+  },
+  {
+    "pair_id": "summarize:art-026",
+    "article_id": "art-026",
+    "task": "summarize",
+    "text_a": "Googleは2025年にAIデータセンター拡張に伴い、年間電力消費が37%増加し、これは同社の史上最大の増分であると報告した。データセンターの電力使用量は42 million MWhを超え、ニュージーランドやデンマーク、ナイジェリアといった国の消費量に匹敵する規模となった。 operational carbon emissionsは2%減少したが、これは同社が大量のクリーンエネルギーを継続して購入していることによるものとされる。サプライチェーンからの排出量は、アジア太平洋地域の電力網が炭素フリーエネルギー供給が不足しているため、25%増加した。全体的な野心ベースの排出量は2024年比で18%上昇した。",
+    "text_b": "2025 年、Google の電力使用量は AI データセンターの建設拡大に伴い前年比 37% 増となり、同社史上最大の増加となりました。その結果、データセンターの年間消費量は 4200 万兆ワット時を記録し、ニュージーランドやデンマークといった国全体の消費量に匹敵する規模となりました。しかし、電力使用量の増加にもかかわらず、Google は事業運営に伴う排出量を 2% 削減することに成功し、電力消費と排出量の分離（デカップリング）を実現しました。"
+  },
+  {
+    "pair_id": "summarize:art-027",
+    "article_id": "art-027",
+    "task": "summarize",
+    "text_a": "米国連邦政府の科学研究資金を支配する新しい規則案が、行政予算庁（OMB）によって提出され、正式化されれば政治優先度が科学者の意見より上となり、研究資金の取り消しや出版・会議への承認を政治任命者に委ねる内容です。この規則案には法的効力があり、以前の実行命令に比べて訴訟でchallenge（挑戦）するのがより困難となります。7 月 13 日までの期間内に、この規則案に対する公衆のフィードバックを提出することが必要となります。",
+    "text_b": "OMB 提案では、連邦政府が交付する助成金（米科学研究の大半を支える）の管理方法を規定し、政治的優先事項が資金配分の主要な基準となり、科学者の意見が軽視される。  \n法案は施行前に公聴会と検討のプロセスを経ており、回答期限は7月13日である。  \nこの規則は、助成金が発行された後に政治的判断で取消し可能であり、また「国家の利益」や「政権方針との整合性」といった曖昧な政治的基準に基づく決定を許容する。  \n編集者はこの提案が科学への影響を危険に及ぼすと指摘し、市民の意見が重要であると述べている。"
+  },
+  {
+    "pair_id": "summarize:art-028",
+    "article_id": "art-028",
+    "task": "summarize",
+    "text_a": "T-Mobileは、BroadcomがVMwareの永続ライセンスおよびサポート義務を負っていたと主張して、2025年8月にニューヨーク州最高裁判所（最高法院）に訴えている。  \nT-Mobileは、約30万3千台の仮想マシンをVMware上のソフトウェアで運用しており、数千台のアプリケーションを含むため、移行が技術的困難であると主張している。  \nBroadcomがVMwareを買収した後、T-Mobileは2023年に取得したVMwareの永続ライセンスおよび2年間のサポートオプションを1年目として継続することを求めたが、Broadcomは拒否した。  \n裁判所は、T-Mobileに対し、2025年10月から2026年8月までのサポートサービスを許可する仮差押さえを付与し、費用として528万ドルと50万ドルの保証金を求めた。",
+    "text_b": "T-Mobile は、Broadcom が VMware の永続ライセンス販売を停止し、サポート延長を拒否したため、NY 州最高裁判所に対し契約上の義務履行を求めています。同社は約 30 万コアの仮想マシンで VMware を使用し、1,000 以上のアプリケーションを移行する際の技術的課題を指摘しています。裁判所は 2025 年 10 月から 2026 年 8 月 3 日までのサポート提供を命じる命令を出しましたが、T-Mobile はさらにサポートの権利を宣言する求告を行っています。"
+  },
+  {
+    "pair_id": "summarize:art-029",
+    "article_id": "art-029",
+    "task": "summarize",
+    "text_a": "New Glenn ロケットの発射失敗後、ブルーオリジンは修復作業と原因調査に大幅なリソースを投入しており、米空軍も計画に深く関与している。NASA は、同社の Mk.1 ロンダが月への貨物ミッション、Mk.2 ロンダが有人月面着陸を担う計画を推進しており、New Glenn が両者の発射に不可欠である。CEO のデイブ・リンプは、本年末までに Launch Complex 36A の再構築と復航ミッションを完了する方針を示したが、NASA 内部や独立した専門家は、12 月から 18 ヶ月程度が必要と予測している。NASA は、貨物ミッション「エンデュランス」が New Glenn で発射されることを希望している。",
+    "text_b": "NASA Administrator Jared Isaacman praised Blue Origin’s progress after the May explosion of its New Glenn rocket. The company has devoted significant resources to cleaning up the launch pad and is working with the U.S. Space Force following the incident. NASA depends on Blue Origin’s Mk.1 lander for cargo missions and its Mk.2 lander for crewed lunar flights, both intended for launch aboard New Glenn, while some NASA officials have expressed skepticism about this timeline. The company aims to rebuild Launch Complex 36A, finish the anomaly investigation, and launch New Glenn by the end of this year, though independent observers estimate a 12‑ to 18‑month timeline for the rocket’s return."
+  }
+]

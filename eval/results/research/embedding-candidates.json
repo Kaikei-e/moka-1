@@ -1,0 +1,154 @@
+{
+  "summary": "JMTEB v2のリーダーボードはMTEB Leaderboard(HF)に統合済みで、日本語Retrievalの実測トップはruri-v3系(81.89)・PLaMo-Embedding-1B(79.94)・sarashina-embedding-v2-1b(JMTEB v2 Retrieval 76.48)だが、いずれも優先配布元のGGUFが存在しない。llama.cpp b9859(2026-07-01)で「配布元縛りを満たして確実に動く」のはQwen公式のQwen3-Embedding-0.6B/4B GGUFとggml-org配布のbge-m3 Q8_0の3つ。既知のissue #14234(Qwen3-Embedding出力破損)はEOS未付与が原因で、公式GGUFはadd_eos_token=trueとpooling_type=last(3)をメタデータに焼き込み済みであることをGGUFヘッダ実測で確認したため、b9859では追加の手当は不要。なおb9859はPR #15641(2025-12-22)由来のmodern-bertアーキを含むため、日本語最強のruri-v3-310m(Apache-2.0)を公式safetensorsから自前変換して動かす道があり、これを最有力watchとする。EmbeddingGemmaとmultilingual-e5は日本語Retrievalが弱く不採用。",
+  "key_findings": [
+    {
+      "finding": "JMTEB v2(28データセット)のリーダーボードはGitHubリポジトリでの管理を終了し、MTEB Leaderboard(General Purpose → Language-specific → Japanese)に統合された。日本語Retrievalスコアの一次情報はモデルカード側に集約されている。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/sbintuitions/JMTEB",
+        "https://huggingface.co/spaces/mteb/leaderboard"
+      ]
+    },
+    {
+      "finding": "日本語Retrieval実測値: ruri-v3-310m 81.89 / ruri-v3-130m 81.89(JMTEB Avg 77.24/76.55)、PLaMo-Embedding-1B 79.94、sarashina-embedding-v1-1b 77.61、OpenAI text-embedding-3-large 74.48、multilingual-e5-large 70.98(cl-nagoyaモデルカードの比較表)。sarashina-embedding-v2-1bはJMTEB v2でAvg 76.38 / Retrieval 76.48と自己申告トップ。日本語特化モデルが多言語モデルを大差で上回る構図。",
+      "confidence": "high",
+      "sources": [
+        "https://huggingface.co/cl-nagoya/ruri-v3-310m",
+        "https://huggingface.co/sbintuitions/sarashina-embedding-v2-1b"
+      ]
+    },
+    {
+      "finding": "Qwen3-Embedding-0.6BのJMTEB Retrievalは72.81で、ruri-v3-310m(81.89)に約9pt劣るがmultilingual-e5-large(70.98)よりは上(secon.devによる第三者JMTEB実測、2025-06)。著者は「日本語タスクはあまり性能が出ない」と結論。ただしGGUF優先配布元縛りの中では最良の日本語スコア。",
+      "confidence": "high",
+      "sources": [
+        "https://secon.dev/entry/2025/06/11/100000-qwen3-embedding-jmteb/"
+      ]
+    },
+    {
+      "finding": "llama.cpp issue #14234(Qwen3-Embedding-0.6BのBad output)の根本原因はEOSトークン(<|endoftext|>)の未付与。ggerganovの回答(入力末尾に手動付与)で2025-06-17にクローズ。公式Qwen/Qwen3-Embedding-0.6B-GGUFのQ8_0ヘッダを実際にパースして確認した結果、tokenizer.ggml.add_eos_token=true、qwen3.pooling_type=3(LAST)がメタデータに設定済みで、b9859では手動EOS付与は不要。--pooling lastも既定値としてGGUFから読まれる(明示指定は無害)。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/issues/14234",
+        "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF"
+      ]
+    },
+    {
+      "finding": "llama.cpp b9859(2026-07-01リリース)はmodern-bertアーキテクチャを含む(PR #15641「Modern Bert Support」、2025-12-22マージ、Granite Embedding R2向け)。よってruri-v3(ModernBERT-Jaベース、SentencePieceトークナイザ)の自前GGUF変換が原理的に可能になったが、コミュニティ変換(Targoyle)はパッチ版llama.cppを要した経緯があり、b9859のconvert_hf_to_gguf.pyでModernBERT-Ja+SentencePieceが素通しできるかはローカル検証が必要。公式GGUFは存在しない。",
+      "confidence": "medium",
+      "sources": [
+        "https://github.com/ggml-org/llama.cpp/pull/15641",
+        "https://huggingface.co/Targoyle/ruri-v3-310m-GGUF",
+        "https://github.com/ggml-org/llama.cpp/releases/tag/b9859"
+      ]
+    },
+    {
+      "finding": "bge-m3はggml-org配布のGGUF(ggml-org/bge-m3-Q8_0-GGUF、0.63GB、MIT)が存在し、配布元優先順位2位を満たす。GGUFメタデータ実測: arch=bert、pooling_type=2(CLS)、ctx 8192、1024次元、add_bos/add_eos=true。BERT系はllama.cppで枯れておりb9859で確実に動く。prefix不要な点が運用上最も簡単だが、日本語Retrievalは多言語モデル水準(mE5-large 70.98と同帯域の70台前半)でruri-v3に大きく劣る。",
+      "confidence": "high",
+      "sources": [
+        "https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF",
+        "https://huggingface.co/cl-nagoya/ruri-v3-310m"
+      ]
+    },
+    {
+      "finding": "EmbeddingGemma-300mはggml-org公式GGUF(Q8_0 334MB)がありb9859で動くが、secon.devのJMTEB実測で「日本語性能は非常に低い」と結論されており日本語Retrieval用途では不採用。multilingual-e5系は優先配布元のGGUFが実質存在せず(ggml-orgにあるのは英語版e5-small-v2のみ)、スコア(70.98)もbge-m3以下のため不採用。",
+      "confidence": "high",
+      "sources": [
+        "https://secon.dev/entry/2025/09/18/100000-embedding-gemma300m/",
+        "https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF",
+        "https://huggingface.co/cl-nagoya/ruri-v3-310m"
+      ]
+    },
+    {
+      "finding": "Qwen3-Embedding-4Bは公式GGUF(Q4_K_M 2.5GB〜Q8_0 4.28GB、Apache-2.0)があり、2560次元・MRL 32-2560・ctx 32k。多言語ベンチでは0.6Bを大きく上回るが、日本語JMTEBでの第三者実測は0.6Bのみで4Bの日本語実測値は未確認。日本語での費用対効果は要ローカル検証。",
+      "confidence": "medium",
+      "sources": [
+        "https://huggingface.co/Qwen/Qwen3-Embedding-4B-GGUF",
+        "https://huggingface.co/Qwen/Qwen3-Embedding-4B"
+      ]
+    },
+    {
+      "finding": "sarashina-embedding-v2-1b(Llamaベース1B、1792次元、last-token pooling、query prefix『task: {instruction}\\nquery: {query}』/文書『text: {document}』)はJMTEB v2トップ級だがGGUF配布なし、かつSarashina Model NonCommercial License(非商用)。PLaMo-Embedding-1B(Apache-2.0)はPLaMo独自アーキでllama.cpp embedding変換の実績がなくGGUFもない。",
+      "confidence": "high",
+      "sources": [
+        "https://huggingface.co/sbintuitions/sarashina-embedding-v2-1b",
+        "https://huggingface.co/pfnet/plamo-embedding-1b",
+        "https://tech.preferred.jp/ja/blog/plamo-embedding-1b/"
+      ]
+    },
+    {
+      "finding": "2026年の実運用ベンチ(日英韓中2000問RAG)でもローカル最良コスパはruri-v3-310mと報告されており、非日本語クエリ→日本語文書でも多言語モデル並みに機能する。RSSリーダー(日本語記事主体)というmoka-1のワークロードにはruri-v3が理想形で、GGUF化の可否だけが障壁。",
+      "confidence": "medium",
+      "sources": [
+        "https://zenn.dev/fp16/articles/aa48dcae23974e",
+        "https://zenn.dev/cahal_inc/articles/21211c78841847"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "name": "Qwen3-Embedding-0.6B(第一候補・即戦力)",
+      "hf_repo_quant": "Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0",
+      "size_gb": 0.64,
+      "dims": "1024(MRL: 32-1024で切り詰め可、切り詰め後はL2再正規化必須)",
+      "license": "Apache-2.0",
+      "server_flags": "--embedding --pooling last -ngl 99 -c 8192 --ubatch-size 8192(pooling/EOSはGGUFメタデータに焼き込み済み: add_eos_token=true, pooling_type=last。b9859で手動<|endoftext|>付与は不要)",
+      "notes": "クエリ側のみprefix『Instruct: Given a web search query, retrieve relevant passages that answer the query\\nQuery: {query}』(英語推奨、+1〜5%)、文書側はprefixなし。JMTEB Retrieval 72.81(第三者実測)で優先配布元GGUF中では日本語最良。ctx 32k対応。VRAM負荷は誤差レベルで常駐可能。",
+      "verdict": "adopt-candidate"
+    },
+    {
+      "name": "bge-m3(バックアップ・prefix不要で最も枯れている)",
+      "hf_repo_quant": "ggml-org/bge-m3-Q8_0-GGUF:Q8_0",
+      "size_gb": 0.63,
+      "dims": "1024(MRL非対応)",
+      "license": "MIT",
+      "server_flags": "--embedding -ngl 99 -c 8192(GGUFメタデータ実測: arch=bert, pooling_type=CLS, add_bos/add_eos=true — フラグ追加不要で正しく動く)",
+      "notes": "query/documentともprefix一切不要で運用が最も単純。BERT系アーキはllama.cppで最も枯れておりb9859で確実。ctx 8192。ただし日本語Retrievalは70台前半でQwen3-0.6Bよりやや下、ruri-v3には大差で劣る。Qwen3のprefix運用が面倒になった場合の保険。",
+      "verdict": "adopt-candidate"
+    },
+    {
+      "name": "Qwen3-Embedding-4B(精度を金で買う枠)",
+      "hf_repo_quant": "Qwen/Qwen3-Embedding-4B-GGUF:Q4_K_M(精度重視ならQ8_0 4.28GB)",
+      "size_gb": 2.5,
+      "dims": "2560(MRL: 32-2560 → pgvectorは1024に切り詰めて0.6Bと列互換にする運用が可能)",
+      "license": "Apache-2.0",
+      "server_flags": "--embedding --pooling last -ngl 99 -c 8192(0.6Bと同一。EOS/pooling焼き込みも同様)",
+      "notes": "多言語ベンチでは0.6Bを大幅に上回るが、日本語JMTEBの第三者実測は0.6Bのみで4Bの日本語値は未確認 — 採用前に手元の日本語記事コーパスでrecall@k比較を推奨。VRAM 48GiBなら常駐余裕だが、埋め込みは大量バッチ処理なのでt/sとの兼ね合いで0.6Bと比較すること。",
+      "verdict": "adopt-candidate"
+    },
+    {
+      "name": "Ruri v3 310m(watch最有力: 日本語Retrieval 81.89でスコア圧勝、自前変換の検証待ち)",
+      "hf_repo_quant": "cl-nagoya/ruri-v3-310m(公式safetensorsからb9859のconvert_hf_to_gguf.pyで自前F16/Q8_0変換 — 公式GGUFなし)",
+      "size_gb": 0.35,
+      "dims": "768(MRL非対応)",
+      "license": "Apache-2.0",
+      "server_flags": "--embedding -ngl 99 -c 8192(mean pooling、変換が通ればGGUFメタデータに入る想定)",
+      "notes": "prefix: クエリ『検索クエリ: 』/文書『検索文書: 』。b9859はmodern-bertアーキ対応(PR #15641、2025-12マージ)だがGranite Embedding(英語・WordPiece)向け実装のため、ModernBERT-Ja+SentencePieceの変換・トークナイズが素通しできるかは未検証(過去のコミュニティ変換はパッチ版llama.cppを要した)。変換に成功しJMTEB相当の品質が出れば全候補を置き換える価値がある。",
+      "verdict": "watch"
+    },
+    {
+      "name": "sarashina-embedding-v2-1b(watch: JMTEB v2トップ級だが非商用ライセンス+GGUFなし)",
+      "hf_repo_quant": "sbintuitions/sarashina-embedding-v2-1b(GGUF配布なし・Llamaベースなので自前変換は技術的に可能性あり)",
+      "size_gb": 1.2,
+      "dims": "1792",
+      "license": "Sarashina Model NonCommercial License(非商用。商用は要問い合わせ)",
+      "notes": "JMTEB v2 Avg 76.38 / Retrieval 76.48。prefix: クエリ『task: {instruction}\\nquery: {query}』/文書『text: {document}』、last-token pooling。個人ドッグフーディングなら使えるがライセンスが将来の足かせになるため優先度低。",
+      "verdict": "watch"
+    },
+    {
+      "name": "EmbeddingGemma-300m(却下記録)",
+      "hf_repo_quant": "ggml-org/embeddinggemma-300M-GGUF:Q8_0",
+      "size_gb": 0.33,
+      "dims": "768(MRL: 768/512/256/128)",
+      "license": "Gemma Terms of Use",
+      "notes": "ggml-org公式GGUFがありb9859で確実に動くが、第三者JMTEB実測で日本語性能が非常に低いと結論されており、日本語主体のmoka-1では不採用。",
+      "verdict": "reject"
+    }
+  ],
+  "recommendations": [
+    "第一候補としてQwen/Qwen3-Embedding-0.6B-GGUF:Q8_0(639MB)を採用し、`llama-server --embedding --pooling last -ngl 99 -c 8192`で常駐させる。公式GGUFはadd_eos_token=true/pooling_type=last焼き込み済みを実測確認済みなので、issue #14234系の対策(手動<|endoftext|>付与)は不要。クエリ側のみ英語instruction prefix(Instruct: ...\\nQuery: ...)を付け、文書側は素のまま埋め込む。",
+    "pgvectorの列は1024次元で切る(vector(1024))。Qwen3-0.6Bのネイティブ次元かつbge-m3とも互換なので、モデル差し替え時にスキーマ変更が要らない。将来Qwen3-4Bに上げる場合もMRLで2560→1024に切り詰め(切り詰め後にL2正規化)れば同一列を維持できる。ただしモデルを替えたら既存ベクトルは全再埋め込みが必要な点は変わらない。",
+    "採用前スパイクとして、b9859のconvert_hf_to_gguf.pyでcl-nagoya/ruri-v3-310m(Apache-2.0)のGGUF変換を試すこと。b9859はmodern-bertアーキを含む(PR #15641)ため動く可能性があり、成功すれば日本語Retrieval 81.89 vs 72.81の大差でQwen3-0.6Bを置き換える価値がある。検証は (1)変換が通るか (2)llama-server --embeddingでsentence-transformers出力とのcos類似度が~0.99か (3)『検索クエリ: 』『検索文書: 』prefixの効き、の3点。",
+    "bge-m3(ggml-org/bge-m3-Q8_0-GGUF)はprefix不要のフォールバックとしてADRに次点記録。EmbeddingGemmaとmultilingual-e5は日本語性能を理由に不採用と明記する。",
+    "埋め込みモデルはVRAM 48GiBに対して誤差(0.6-2.5GB)なので、LLM本体と同時常駐で問題ない。ただしRSS全記事のバックフィル時はubatch/並列リクエスト設定がスループットを支配するため、`--ubatch-size 8192 --parallel 4`程度から実測チューニングすること。"
+  ]
+}

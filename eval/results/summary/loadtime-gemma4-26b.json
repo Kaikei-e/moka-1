@@ -1,0 +1,11 @@
+{
+  "model_key": "gemma4-26b",
+  "model_hf": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+  "load_times_s": [
+    24.4,
+    17.2,
+    19.1
+  ],
+  "note": "1回目=コールド寄り、以降=ページキャッシュ次第(ホストRAM16GB)",
+  "created_at": "2026-07-02T15:34:03+00:00"
+}

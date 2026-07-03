@@ -1,0 +1,14 @@
+{
+  "run_id": "d1-qwen4b-summ",
+  "model_key": "qwen35-4b",
+  "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+  "task": "summarize",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "f7ecea2a18bd13247ba6e13b75f06438c5e4e5aa8c08adefb3a567ef88956e74",
+  "n_items": 30,
+  "load_time_s": 7.2,
+  "started_at": "2026-07-02T16:51:49+00:00"
+}

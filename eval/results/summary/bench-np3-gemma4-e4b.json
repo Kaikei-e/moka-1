@@ -1,0 +1,11 @@
+{
+  "model_key": "gemma4-e4b",
+  "np": 3,
+  "per_stream_tg_tps": [
+    23.0,
+    24.2,
+    24.2
+  ],
+  "aggregate_tg_tps": 45.5,
+  "wall_s": 8.4
+}

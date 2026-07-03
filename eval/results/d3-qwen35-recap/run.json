@@ -1,0 +1,14 @@
+{
+  "run_id": "d3-qwen35-recap",
+  "model_key": "qwen35-35b",
+  "model_hf": "unsloth/Qwen3.5-35B-A3B-GGUF:UD-Q4_K_XL",
+  "task": "recap",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "1d539645fc8d5987c656f53a216dfe6d90b4fd162bd02849a4ebdf5667a8e610",
+  "n_items": 3,
+  "load_time_s": 34.3,
+  "started_at": "2026-07-02T16:55:40+00:00"
+}

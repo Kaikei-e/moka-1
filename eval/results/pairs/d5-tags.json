@@ -1,0 +1,212 @@
+[
+  {
+    "pair_id": "tags:art-000",
+    "article_id": "art-000",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"UNIX系コマンドのWindows移植\",\n    \"Linuxコンテナ（WSL）\",\n    \"Ubuntuサンドボックス開発環境\",\n    \"AIエージェントと開発環境\",\n    \"Microsoftの最新技術動向\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Coreutils for Windows\",\n    \"WSL containers\",\n    \"Container machine\",\n    \"Ubuntu Workshop\",\n    \"Microsoft AI Models\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-001",
+    "article_id": "art-001",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Agent Name Service（ANS）\",\n    \"AIエージェント\",\n    \"Linux Foundation\",\n    \"分散型識別子 (DID)\",\n    \"法的主体識別コード (LEI)\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Agent Name Service\",\n    \"Linux Foundation\",\n    \"AI エージェント\",\n    \"DNS\",\n    \"アイデンティティ管理\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-002",
+    "article_id": "art-002",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Astro 7.0\",\n    \"静的サイトジェネレータ\",\n    \"Vite 8\",\n    \"Rust\",\n    \"Cloudflare\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Astro 7.0\",\n    \"Rust コンパイラ\",\n    \"Vite 8\",\n    \"Rolldown\",\n    \"Cloudflare\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-003",
+    "article_id": "art-003",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Google IPv6\",\n    \"APNIC測定\",\n    \"日本\",\n    \"インターネット移行\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"IPv6\",\n    \"Google\",\n    \"インターネット基盤\",\n    \"技術移行\",\n    \"APNIC\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-004",
+    "article_id": "art-004",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"WSL Containers\",\n    \"パブリックプレビュー\",\n    \"マイクロソフト\",\n    \"Windows\",\n    \"Linux コンテナ\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"WSLコンテナ\",\n    \"Linuxファイルアクセス高速化\",\n    \"パブリックプレビュー\",\n    \"性能向上\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-005",
+    "article_id": "art-005",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"クアルコム\",\n    \"Modular社\",\n    \"Mojo\",\n    \"AIデータセンター\",\n    \"LLVM\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"クアルコム\",\n    \"Mojo\",\n    \"Modular社買収\",\n    \"AIデータセンター\",\n    \"Pythonライクな言語\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-006",
+    "article_id": "art-006",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Deno 2.9\",\n    \"Deno Desktop\",\n    \"高速起動\",\n    \"省メモリ化\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Deno\",\n    \"Deno 2.9\",\n    \"Deno Desktop\",\n    \"起動速度向上\",\n    \"メモリ削減\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-007",
+    "article_id": "art-007",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"AWS Lambda MicroVMs\",\n    \"ステートフルな実行環境\",\n    \"MicroVM\",\n    \"Firecracker\",\n    \"サーバレス\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"AWS Lambda MicroVMs\",\n    \"サーバレス\",\n    \"ステートフル\",\n    \"隔離環境\",\n    \"MicroVM\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-008",
+    "article_id": "art-008",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"TypeScript\",\n    \"Go言語\",\n    \"リリース候補\",\n    \"スケーラビリティ\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"TypeScript\",\n    \"Go言語\",\n    \"コンパイラ\",\n    \"パフォーマンス向上\",\n    \"マイクロソフト\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-009",
+    "article_id": "art-009",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\"GitHub\", \"プルリクエスト制限\", \"AI支援コード生成\", \"オープンソース\"]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"GitHub\",\n    \"プルリクエスト\",\n    \"AI\",\n    \"オープンソース\",\n    \"開発効率\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-010",
+    "article_id": "art-010",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"AWS Continuum\",\n    \"脆弱性推論\",\n    \"非構造化データ\",\n    \"ビジネスコンテキスト\",\n    \"AIモデル依存しない設計\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"AWS Continuum\",\n    \"セキュリティ\",\n    \"コードスキャン\",\n    \"AI 依存しない設計\",\n    \"脅威モデリング\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-011",
+    "article_id": "art-011",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"AWS Transform – continuous modernization\",\n    \"技術的負債\",\n    \"コード自動スキャン\",\n    \"プルリクエスト\",\n    \"AIエージェント\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"AWS Transform\",\n    \"AI エージェント\",\n    \"技術的負債\",\n    \"コード変換\",\n    \"プレビュー公開\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-012",
+    "article_id": "art-012",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"AIエージェント\",\n    \"GLM-5.2\",\n    \"ZCode\",\n    \"オープンモデル\",\n    \"ベンチマーク\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"GLM-5.2\",\n    \"ZCode\",\n    \"Z.ai\",\n    \"AI エージェント\",\n    \"オープンモデル\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-013",
+    "article_id": "art-013",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Godot\",\n    \"オープンソース\",\n    \"AI\",\n    \"コード生成\",\n    \"コントリビューションポリシー\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Godot\",\n    \"AIコード\",\n    \"コントリビューション政策\",\n    \"自律型AIエージェント\",\n    \"バイブコーディング\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-014",
+    "article_id": "art-014",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\"Belkin\", \"Nintendo Switch 2\", \"USB-Cケーブル\", \"急速充電\", \"テスト結果\"]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Nintendo Switch 2\",\n    \"充電速度\",\n    \"USB-Cケーブル\",\n    \"Belkin\",\n    \"LTT Labs\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-015",
+    "article_id": "art-015",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"麻辣レベル\",\n    \"カップ麺\",\n    \"四川料理\",\n    \"辛さ評価\",\n    \"食品レビュー\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"明星 中華三昧カップ 四川飯店 汁なし四川麻辣麺\",\n    \"試食レビュー\",\n    \"麻辣麺\",\n    \"汁なしカップ麺\",\n    \"四川料理\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-016",
+    "article_id": "art-016",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"アリババ\",\n    \"AliExpress\",\n    \"和解\",\n    \"薬物販売規制\",\n    \"罰金\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\"AliExpress\", \"FDCA違反\", \"違法医薬品販売\", \"和解案\", \"米司法省\"]\n}"
+  },
+  {
+    "pair_id": "tags:art-017",
+    "article_id": "art-017",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"GitHub Copilot\",\n    \"Visual Studio Code\",\n    \"AI エージェント\",\n    \"ブラウザ自動化\",\n    \"ウェブアプリ検証\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"GitHub Copilot\",\n    \"ブラウザ操作ツール\",\n    \"AIエージェント\",\n    \"VS Code\",\n    \"検証\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-018",
+    "article_id": "art-018",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"人工細胞\",\n    \"SpudCell\",\n    \"合成生物学\",\n    \"細胞分裂\",\n    \"ミネソタ大学\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"人工細胞\",\n    \"SpudCell\",\n    \"合成生物学\",\n    \"細胞分裂\",\n    \"生命の起源\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-019",
+    "article_id": "art-019",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Apple\",\n    \"MacBook Pro\",\n    \"デザイン変更計画\",\n    \"エントリーレベル\",\n    \"2027年\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Apple\",\n    \"MacBook Pro\",\n    \"デザイン変更\",\n    \"2027 年発売\",\n    \"Bloomberg\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-020",
+    "article_id": "art-020",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"高温\",\n    \"気象庁\",\n    \"天候情報\",\n    \"7 月\",\n    \"各地\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\"高温予測\", \"地域別\", \"気象庁\", \"早期天候情報\"]\n}"
+  },
+  {
+    "pair_id": "tags:art-021",
+    "article_id": "art-021",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"ハンタ集団感染\",\n    \"WHO\",\n    \"収束宣言\",\n    \"クルーズ船 MVホンディウス\",\n    \"ハンタウイルス\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"ハンタウイルス\",\n    \"WHO\",\n    \"クルーズ船\",\n    \"集団感染\",\n    \"収束宣言\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-022",
+    "article_id": "art-022",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"タイ\",\n    \"交通事故\",\n    \"少年運転\",\n    \"僧侶\",\n    \"死亡事故\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"タイでの交通事故\",\n    \"11歳の少年運転\",\n    \"僧侶列への衝突\",\n    \"9人の死亡\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-023",
+    "article_id": "art-023",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\"経済\"]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"ブルボン\",\n    \"菓子\",\n    \"自主回収\",\n    \"食中毒\",\n    \"健康被害\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-024",
+    "article_id": "art-024",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"テレビ東京\",\n    \"番組物議\",\n    \"※女性は見ないでください\",\n    \"炎上問題\",\n    \"メディア論争\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"テレ東\",\n    \"女性は見ないでください\",\n    \"炎上\",\n    \"謝罪\",\n    \"定例会見\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-025",
+    "article_id": "art-025",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"コバルト中毒\",\n    \"人工股関節\",\n    \"股関節再手術\",\n    \"神経症状\",\n    \"高血圧\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"コバルト中毒\",\n    \"人工股関節置換術\",\n    \"神経症状\",\n    \"New England Journal of Medicine\",\n    \"症例報告\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-026",
+    "article_id": "art-026",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\"Google AIデータセンターによる電力使用増加\"]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"Google\",\n    \"AI インフラ\",\n    \"電力消費\",\n    \"環境対策\",\n    \"サステナビリティ\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-027",
+    "article_id": "art-027",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"科学研究\",\n    \"米国連邦政府\",\n    \"資金配分\",\n    \"政治的干渉\",\n    \"オバマ政権\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"政府の予算政策\",\n    \"科学研究への政治的介入\",\n    \"科学者の意見の排除\",\n    \"行政手続きの複雑化\",\n    \"法的根拠のある規則\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-028",
+    "article_id": "art-028",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"T-Mobile\",\n    \"VMware\",\n    \"訴訟\",\n    \"サポートサービス\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"T-Mobile\",\n    \"Broadcom\",\n    \"VMware\",\n    \"訴訟\",\n    \"クラウド移行\"\n  ]\n}"
+  },
+  {
+    "pair_id": "tags:art-029",
+    "article_id": "art-029",
+    "task": "tags",
+    "text_a": "{\n  \"tags\": [\n    \"Blue Origin\",\n    \"New Glenn\",\n    \"NASA\",\n    \"月面着陸\",\n    \"ロケット発射\"\n  ]\n}",
+    "text_b": "{\n  \"tags\": [\n    \"NASA\",\n    \"ブルー起源\",\n    \"新グレン\",\n    \"打ち切り失敗\",\n    \"クリーンアップ\"\n  ]\n}"
+  }
+]

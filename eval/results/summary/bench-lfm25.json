@@ -1,0 +1,56 @@
+{
+  "model_key": "lfm25",
+  "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+  "llamacpp_build": "b9859",
+  "reps": [
+    {
+      "model_key": "lfm25",
+      "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 0,
+      "pp_n": 599,
+      "pp_ms": 630.992,
+      "pp_tps": 949.3,
+      "tg_n": 128,
+      "tg_ms": 1903.164,
+      "tg_tps": 67.3,
+      "vram_used_gib": 6.67,
+      "gtt_used_gib": 0.19,
+      "created_at": "2026-07-02T15:21:48+00:00"
+    },
+    {
+      "model_key": "lfm25",
+      "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 1,
+      "pp_n": 599,
+      "pp_ms": 631.026,
+      "pp_tps": 949.2,
+      "tg_n": 128,
+      "tg_ms": 1900.491,
+      "tg_tps": 67.4,
+      "vram_used_gib": 6.67,
+      "gtt_used_gib": 0.19,
+      "created_at": "2026-07-02T15:21:51+00:00"
+    },
+    {
+      "model_key": "lfm25",
+      "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 2,
+      "pp_n": 599,
+      "pp_ms": 632.298,
+      "pp_tps": 947.3,
+      "tg_n": 128,
+      "tg_ms": 1906.99,
+      "tg_tps": 67.1,
+      "vram_used_gib": 6.67,
+      "gtt_used_gib": 0.19,
+      "created_at": "2026-07-02T15:21:53+00:00"
+    }
+  ],
+  "created_at": "2026-07-02T15:21:54+00:00"
+}

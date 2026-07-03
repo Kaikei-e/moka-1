@@ -1,0 +1,104 @@
+{
+  "summary": "2026-07-02時点の新モデル掃引の結果、4役割中3役割(高速パス・提案層・集約層)は現pin維持が妥当と判断した。高速パスのLFM2.5-8B-A1Bは2026-05-31公開の最新世代で日本語トークナイザ改善済み、提案層はQwen3.6に4B級が存在せずgemma-4-E4Bも既にQAT版をpin済み、集約層のgpt-oss-20bに後継はない。唯一の追加提案はスワップ枠で、Gemma 4 26B-A4B(2026-04-02公開、MoE 25.2B/アクティブ3.8B、UD-Q4_K_XL 17GB)が制約内(≤21GB)かつ日本語の第三者評価が高く、Qwen3.6-35B-A3BとのA/B比較候補に値する。また集約層のwatch対象としてSwallowチームの日本語強化版GPT-OSS-Swallow-20B-RL-v0.1(2026-02-20)を挙げるが、公式GGUFが未提供のため配布元縛りにより現時点では採用不可。",
+  "key_findings": [
+    {
+      "finding": "高速パス: LiquidAIの最新は依然LFM2.5系。現pinのLFM2.5-8B-A1B(総8.3B/アクティブ1.5B)は2026-05-31公開で、日本語トークン化効率が旧版比+6.9%改善済み。6月の新作はLFM2.5-230M(6/25)のみでサイズ級が異なる。LFM3は「2026年内・AMD AI PC最適化」と予告されているが未リリース。",
+      "confidence": "high",
+      "sources": [
+        "https://gigazine.net/gsc_news/en/20260531-lfm25-8b-a1b/",
+        "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B",
+        "https://www.liquid.ai/blog/lfm2-5-230m",
+        "https://gigazine.net/gsc_news/en/20260107-lfm2-5-on-device-ai/"
+      ]
+    },
+    {
+      "finding": "提案層: Qwen3.6のopen weightsは27B denseと35B-A3Bのみで4B級後継は依然存在しない(小型最新はQwen3.5-4B、2026-03-02公開=現pin)。Gemma 4は2026-06-05に全サイズのQATチェックポイントが公開されたが、現pinのgemma-4-E4B-it-qat(UD-Q4_K_XL)は既にQAT重みベースであり乗り換え先がない。IBM Granite 4.1(2026-05-18、3B/8B/30B dense、公式GGUFあり)は日本語性能の根拠が薄く提案層のpinを上回る証跡なし。",
+      "confidence": "high",
+      "sources": [
+        "https://github.com/QwenLM/Qwen3.6",
+        "https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/",
+        "https://research.ibm.com/blog/granite-4-1-ai-foundation-models",
+        "https://huggingface.co/ibm-granite/granite-4.1-8b-GGUF"
+      ]
+    },
+    {
+      "finding": "日本語特化モデルはGGUF配布元縛りで全滅: PLaMo 2系のGGUFは野良(grapevine-AI等)のみでllama.cppのchatテンプレート未登録問題もある。ELYZAの2026年新作はDiffusionアーキテクチャ(llama.cpp非対応)。Swallow小型のGGUFもimatrix野良変換のみ。",
+      "confidence": "medium",
+      "sources": [
+        "https://huggingface.co/grapevine-AI/plamo-2-translate-gguf",
+        "https://github.com/llm-jp/awesome-japanese-llm",
+        "https://swallow-llm.github.io/index.en.html"
+      ]
+    },
+    {
+      "finding": "集約層: OpenAIのgpt-oss-20bに後継・改訂版は出ていない(派生はgpt-oss-safeguardのみで安全分類特化)。一方、Swallowチーム(tokyotech-llm)がgpt-oss-20bの日本語強化版GPT-OSS-Swallow-20B-RL-v0.1を2026-02-20に公開(Apache-2.0、Swallow Leaderboard v2日本語平均0.606、120B版はJP MT-Bench 0.916)。ただし公式GGUFは未提供で、既存GGUFはmradermacher/sashisuseso/dahara1等の野良量子化のみ。モデルカードはvLLMでの実行を強く推奨しておりllama.cpp動作は未検証。",
+      "confidence": "high",
+      "sources": [
+        "https://huggingface.co/tokyotech-llm/GPT-OSS-Swallow-20B-RL-v0.1",
+        "https://openai.com/index/introducing-gpt-oss/",
+        "https://blog.qualiteg.com/llm-ranking-2026/",
+        "https://huggingface.co/sashisuseso/GPT-OSS-Swallow-20B-SFT-v0.1-MXFP4_MOE-GGUF"
+      ]
+    },
+    {
+      "finding": "スワップ枠の新顔: Google Gemma 4 26B-A4B(2026-04-02公開、Apache-2.0)はMoE 25.2B/アクティブ3.8B・コンテキスト256Kで、unsloth UD-Q4_K_XLが17GB(現pin Qwen3.6-35B-A3Bの20.8GBより3.8GB小)。MMLU Proリーダーボード82.6%(2026-04-10時点オープン系トップクラス)、日本語品質は国内第三者レビュー(ギズモード「日本語うますぎ」等)で高評価。アクティブパラメータがQwen3.6-35B-A3B(3B)と同級のためVulkan decode速度も同等以上が見込める。注意: 26B-A4B変種のみGoogle公式GGUF(QAT q4_0)が未提供で、配布はunsloth頼み。",
+      "confidence": "medium",
+      "sources": [
+        "https://ai.google.dev/gemma/docs/core",
+        "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF",
+        "https://news.yahoo.co.jp/articles/17d00f31c6422bfeddd5e87fddebb437e12de12a",
+        "https://gemma4-ai.com/blog/gemma4-which-model"
+      ]
+    },
+    {
+      "finding": "スワップ枠のその他新顔は現pinを上回らない: GLM-4.7-Flash(30B-A3B、2026年1月公開)はSWE-bench Verified 59.2でQwen3.6-35B-A3Bの73.4に及ばず、公開直後に量子化品質の問題も報告された(日本語の読みやすさ自体は良評価)。GLM-5.2(2026年6月)は744B-A40Bで2bitでも241GB必要でサイズ制約外。MiniMax M3(6/1)もフラッグシップ級で対象外。",
+      "confidence": "high",
+      "sources": [
+        "https://huggingface.co/unsloth/GLM-4.7-Flash-GGUF",
+        "https://nowokay.hatenablog.com/entry/2026/01/20/114010",
+        "https://note.com/masa_wunder/n/n41bfbee5c7c5",
+        "https://dev.to/max_quimby/run-glm-52-locally-the-open-model-nobody-can-ban-pnb"
+      ]
+    }
+  ],
+  "recommendations": [
+    "高速パス・提案層・集約層は現pin維持。掃引の結果、明確に上回る公式GGUF配布の新モデルは存在しない。",
+    "スワップ枠にGemma 4 26B-A4B(unsloth/gemma-4-26B-A4B-it-GGUF:UD-Q4_K_XL、17GB)を第三の比較候補として追加DLし、Qwen3.6-35B-A3B vs Qwen3.5-35B-A3BのA/Bに含めて日本語リキャップ品質で実測することを提案。20.8GB→17GBのディスク/VRAM節約と日本語品質の高評価が根拠。採用手順はADR00006の「Web調査→事前DL→Vulkan bench(b9859)→eval→tenets反映」に従う。",
+    "Gemma 4 26B-A4BのGGUFがGoogle QAT重みベースか(ADR00006の「4bitはQAT優先」原則)をDL前にunsloth側のモデルカードで確認し、QATベースでなければGoogle公式のQATチェックポイント動向を待つ判断も可。",
+    "集約層のwatch: tokyotech-llm/GPT-OSS-Swallow-20B-RL-v0.1の公式GGUF(またはunsloth/bartowski版)が出たら即評価。日本語強化されたgpt-oss-20b直系であり、出れば集約層の最有力交代候補。現時点は野良量子化のみのため配布元縛りで見送り。",
+    "高速パスのwatch: LiquidAI LFM3(2026年内予告、AMD AI PC最適化を明言)は開発機のRyzen AI構成と相性が良い可能性が高い。リリース時に公式GGUFとVulkan対応を確認。",
+    "GLM-4.7-Flash・Granite 4.1・PLaMo/ELYZA/Swallow小型は今回見送り(それぞれ品質劣位・日本語根拠不足・公式GGUF不在)。四半期ごとに本掃引を再実行することを推奨。"
+  ],
+  "candidates": [
+    {
+      "name": "Gemma 4 26B-A4B Instruct(スワップ枠・比較候補として追加)",
+      "hf_repo_quant": "unsloth/gemma-4-26B-A4B-it-GGUF:UD-Q4_K_XL",
+      "size_gb": 17,
+      "license": "Apache-2.0",
+      "dims": "MoE 25.2B total / 3.8B active、コンテキスト256K",
+      "server_flags": "-ngl 99 --jinja(llama.cpp b9859でのVulkan動作は要実測)",
+      "verdict": "adopt-candidate",
+      "notes": "2026-04-02公開(QATチェックポイントは6/5)。現pin Qwen3.6-35B-A3B(20.8GB)より3.8GB小さくサイズ制約(≤21GB)に余裕。MMLU Pro 82.6%(2026-04-10時点オープン系トップクラス)+国内第三者レビューで日本語高評価。アクティブ3.8BでA3B系と同級のdecode速度見込み。注意点: 26B-A4B変種のみGoogle公式GGUF未提供でunsloth配布(配布元優先順位3位)、GGUFがQAT重みベースかは要確認。"
+    },
+    {
+      "name": "GPT-OSS-Swallow-20B-RL-v0.1(集約層・公式GGUF待ち)",
+      "hf_repo_quant": "tokyotech-llm/GPT-OSS-Swallow-20B-RL-v0.1(GGUF未提供、safetensorsのみ)",
+      "size_gb": 12,
+      "license": "Apache-2.0",
+      "dims": "21B(gpt-oss-20b系、MXFP4想定で~12GB)",
+      "server_flags": "現pinのgpt-oss-20bと同等想定(--jinja)。ただしllama.cpp動作未検証・vLLM推奨の注記あり",
+      "verdict": "watch",
+      "notes": "2026-02-20公開。Swallowチームによるgpt-oss-20bの日本語RL強化版(Swallow LB v2日本語平均0.606)。集約層pinの直系日本語強化で出自は理想的だが、GGUFは野良量子化(mradermacher/sashisuseso/dahara1)のみで配布元縛りに抵触。公式またはunsloth/bartowski版GGUFが出たら即評価。"
+    },
+    {
+      "name": "GLM-4.7-Flash(スワップ枠・見送り)",
+      "hf_repo_quant": "unsloth/GLM-4.7-Flash-GGUF:Q4_K_M",
+      "size_gb": 18,
+      "license": "MIT",
+      "dims": "MoE 30B total / ~3B active、コンテキスト200K",
+      "server_flags": "-ngl 99 --jinja",
+      "verdict": "reject",
+      "notes": "2026年1月公開(pin選定前)。SWE-bench Verified 59.2でQwen3.6-35B-A3Bの73.4に明確に劣後。公開直後に量子化品質の問題報告(きしだ氏 2026-01-20)。日本語の読みやすさは良評価だが総合で現pinを上回る見込みなし。"
+    }
+  ]
+}

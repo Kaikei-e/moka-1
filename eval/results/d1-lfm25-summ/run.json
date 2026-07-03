@@ -1,0 +1,14 @@
+{
+  "run_id": "d1-lfm25-summ",
+  "model_key": "lfm25",
+  "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+  "task": "summarize",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "f7ecea2a18bd13247ba6e13b75f06438c5e4e5aa8c08adefb3a567ef88956e74",
+  "n_items": 30,
+  "load_time_s": 6.1,
+  "started_at": "2026-07-02T15:34:10+00:00"
+}

@@ -1,0 +1,40 @@
+{
+  "decision": "d1-summarize",
+  "n_pairs": 30,
+  "pair_level_wins": {
+    "lfm25": 7,
+    "qwen35-4b": 18
+  },
+  "ties": 5,
+  "sign_test_p": 0.04329,
+  "winner": "qwen35-4b",
+  "per_lens": {
+    "faithfulness": {
+      "lfm25": 7,
+      "qwen35-4b": 21,
+      "tie": 32
+    },
+    "coverage": {
+      "lfm25": 26,
+      "qwen35-4b": 11,
+      "tie": 23
+    },
+    "conciseness": {
+      "lfm25": 4,
+      "qwen35-4b": 27,
+      "tie": 29
+    },
+    "instruction": {
+      "lfm25": 6,
+      "qwen35-4b": 15,
+      "tie": 39
+    }
+  },
+  "position_consistency": 0.892,
+  "judge_agreement": 0.6,
+  "judges": [
+    "claude",
+    "gptoss20b"
+  ],
+  "created_at": "2026-07-03T00:33:26+00:00"
+}

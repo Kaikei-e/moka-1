@@ -1,0 +1,138 @@
+{
+  "decided_at": "2026-07-03",
+  "protocol": {
+    "quality_ab": "ブラインド化ペア + 位置スワップ両順一致のみ勝ち + 観点レンズ、二重審判(gpt-oss-20b ローカル + Claude Sonnet系エージェント)、両側符号検定",
+    "adoption_threshold": "p<0.05 かつ 決着ペア勝率>=60%(tie除外n<20は検出力不足として補助証拠と併用)",
+    "evidence_research": "results/research/*.json(出典URL付き)"
+  },
+  "decisions": {
+    "D1_fast_path": {
+      "winner": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M (enable_thinking=false)",
+      "loser": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M(高速パスから提案層専任へ降格)",
+      "quality": {
+        "wins": {
+          "qwen35-4b": 18,
+          "lfm25": 7
+        },
+        "ties": 5,
+        "sign_test_p": 0.04329,
+        "decisive_win_rate": 0.72,
+        "judge_agreement": 0.6
+      },
+      "latency": {
+        "qwen35-4b_total_s_median": 6.66,
+        "lfm25_total_s_median": 14.69,
+        "lfm25_cot_share": 0.82
+      },
+      "language": {
+        "english_summaries_lfm25": "7/30",
+        "english_summaries_qwen35_4b": "0/30"
+      },
+      "evidence": [
+        "summary/d1-summarize.json",
+        "d1-lfm25-summ/",
+        "d1-qwen4b-summ/",
+        "d1-lfm25-timing/",
+        "d1-qwen4b-timing/"
+      ]
+    },
+    "D2_aggregator": {
+      "winner": "ggml-org/gpt-oss-20b-GGUF 常駐維持 + 週次リキャップのみ Qwen3.6-35B スワップ",
+      "rejected": "35B常駐化 — ctx 8192では5モデル同時常駐45.9/48.0GiB・劣化ゼロで成立を実証したが、ヘッドルーム~2GiBが薄く却下(KVデフォルト時はホストRAM OOM実測)",
+      "load_times_s": {
+        "gptoss20b": [
+          15.1,
+          5.1,
+          4.0
+        ],
+        "qwen36-35b": [
+          39.3,
+          42.2,
+          38.3
+        ],
+        "qwen35-35b": [
+          32.2,
+          38.3,
+          38.4
+        ],
+        "gemma4-26b": [
+          24.4,
+          17.2,
+          19.1
+        ]
+      },
+      "recap_quality_vs_gptoss": {
+        "qwen36-35b": "3-0-0 (claude審判、gpt-ossは同族のため審判から除外)"
+      },
+      "evidence": [
+        "summary/d2-gptoss-vs-q36.json",
+        "summary/d2-gptoss-vs-g26.json",
+        "summary/loadtime-*.json",
+        "summary/vram-probe.json"
+      ],
+      "vram_probe_ctx8192": {
+        "all_resident_gib": 45.94,
+        "gtt_gib": 0.18,
+        "bench_under_full_residency": {
+          "lfm25_tg": [
+            67.6,
+            67.4
+          ],
+          "qwen36-35b_tg": [
+            23.4,
+            23.3
+          ]
+        }
+      }
+    },
+    "D3_swap_slot": {
+      "winner": "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_XL",
+      "round_robin": {
+        "vs_qwen35-35b": "2-1-0 (両審判合算)",
+        "vs_gemma4-26b": "3-0-0 (両審判一致)",
+        "vs_gptoss20b": "3-0-0 (claude)"
+      },
+      "caveat": "n=3週で符号検定は有意に届かない(方向は全対戦一貫)。ADR00004の採用条件『品質A/Bのみ』を充足",
+      "not_adopted": {
+        "gemma4-26b": "tg 28.0 t/s(+19%)・13.9GBと速度/サイズ優位だが品質で0-3",
+        "qwen35-35b": "敗者。削除はユーザー確認後"
+      },
+      "evidence": [
+        "summary/d3-q36-vs-q35.json",
+        "summary/d3-q36-vs-g26.json",
+        "summary/d3-q35-vs-g26.json",
+        "summary/bench-gemma4-26b.json"
+      ]
+    },
+    "D4_embedding": {
+      "winner": "Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0 @ vector(1024)",
+      "local_eval": "3候補とも天井(recall@1 0.983-1.0、n=60クエリ/30記事)→ローカルでは識別不能と正直に記録",
+      "rationale": "GGUF配布元縛り内でJMTEB日本語Retrieval最良(72.81、第三者実測)+公式GGUF+MRL 32-1024(512まで無劣化実測)+0.64GB常駐",
+      "runner_up": "ggml-org/bge-m3-Q8_0-GGUF(prefix不要、-ub 8192必須)",
+      "watch": "cl-nagoya/ruri-v3-310m(JMTEB 81.89、b9859 modern-bert対応での自前GGUF変換スパイク待ち)",
+      "evidence": [
+        "summary/embed-qwen3-emb-0.6b.json",
+        "summary/embed-qwen3-emb-4b.json",
+        "summary/embed-bge-m3.json",
+        "research/embedding-candidates.json"
+      ]
+    },
+    "D5_tags": {
+      "result": "品質同格(lfm25 14-11-5、p=0.69、審判間一致0.47)。両者json_schemaパース成功率100%",
+      "decision": "高速パス統一により Qwen3.5-4B が担当",
+      "evidence": [
+        "summary/d5-tags.json",
+        "d5-lfm25-tags/",
+        "d5-qwen4b-tags/"
+      ]
+    }
+  },
+  "followups": [
+    "敗者 Qwen3.5-35B-A3B GGUF(20.7GB)の削除(ADR00006の指示、ユーザー確認後)",
+    "schema.sql の embedding vector(1024) 固定 + HNSW(Atlas移行)",
+    "ハイライト提案層のSelf-MoA vs 3異種A/B(arXiv 2502.00674、M3)",
+    "カーネル設定移行案: carve-out最小 + amdgpu.gttsize大盛り(research/uma-vram.json)",
+    "ruri-v3-310m 自前GGUF変換スパイク",
+    "スワップ枠のQ5_K_XL昇格検討(KLD -42%、decode -10〜15%)"
+  ]
+}

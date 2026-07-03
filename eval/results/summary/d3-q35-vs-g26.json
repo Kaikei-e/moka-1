@@ -1,0 +1,40 @@
+{
+  "decision": "d3-q35-vs-g26",
+  "n_pairs": 3,
+  "pair_level_wins": {
+    "gemma4-26b": 1,
+    "qwen35-35b": 2
+  },
+  "ties": 0,
+  "sign_test_p": 1.0,
+  "winner": "qwen35-35b",
+  "per_lens": {
+    "faithfulness": {
+      "gemma4-26b": 2,
+      "qwen35-35b": 1,
+      "tie": 3
+    },
+    "coverage": {
+      "gemma4-26b": 0,
+      "qwen35-35b": 4,
+      "tie": 2
+    },
+    "conciseness": {
+      "gemma4-26b": 0,
+      "qwen35-35b": 0,
+      "tie": 6
+    },
+    "instruction": {
+      "gemma4-26b": 2,
+      "qwen35-35b": 0,
+      "tie": 4
+    }
+  },
+  "position_consistency": 0.708,
+  "judge_agreement": 0.0,
+  "judges": [
+    "claude",
+    "gptoss20b"
+  ],
+  "created_at": "2026-07-03T00:33:27+00:00"
+}

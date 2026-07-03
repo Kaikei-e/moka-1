@@ -1,0 +1,39 @@
+{
+  "decision": "d2-gptoss-vs-g26",
+  "n_pairs": 3,
+  "pair_level_wins": {
+    "gemma4-26b": 1,
+    "gptoss20b": 1
+  },
+  "ties": 1,
+  "sign_test_p": 1.0,
+  "winner": "tie",
+  "per_lens": {
+    "conciseness": {
+      "gemma4-26b": 1,
+      "gptoss20b": 1,
+      "tie": 1
+    },
+    "coverage": {
+      "gemma4-26b": 1,
+      "gptoss20b": 1,
+      "tie": 1
+    },
+    "faithfulness": {
+      "gemma4-26b": 2,
+      "gptoss20b": 0,
+      "tie": 1
+    },
+    "instruction": {
+      "gemma4-26b": 0,
+      "gptoss20b": 1,
+      "tie": 2
+    }
+  },
+  "position_consistency": 0.667,
+  "judge_agreement": null,
+  "judges": [
+    "claude"
+  ],
+  "created_at": "2026-07-03T00:33:27+00:00"
+}

@@ -1,0 +1,22 @@
+{
+  "model_key": "qwen3-emb-4b",
+  "model_hf": "Qwen/Qwen3-Embedding-4B-GGUF:Q8_0",
+  "pooling": "last",
+  "query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ",
+  "full_dim": 2560,
+  "n_corpus": 30,
+  "n_queries": 60,
+  "metrics_by_dim": {
+    "2560": {
+      "recall@1": 0.9833,
+      "recall@3": 1.0,
+      "mrr": 0.9917
+    },
+    "1024": {
+      "recall@1": 1.0,
+      "recall@3": 1.0,
+      "mrr": 1.0
+    }
+  },
+  "created_at": "2026-07-02T16:49:55+00:00"
+}

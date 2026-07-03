@@ -1,0 +1,56 @@
+{
+  "model_key": "qwen35-4b",
+  "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+  "llamacpp_build": "b9859",
+  "reps": [
+    {
+      "model_key": "qwen35-4b",
+      "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 0,
+      "pp_n": 489,
+      "pp_ms": 1147.011,
+      "pp_tps": 426.3,
+      "tg_n": 128,
+      "tg_ms": 5128.291,
+      "tg_tps": 25.0,
+      "vram_used_gib": 12.15,
+      "gtt_used_gib": 0.33,
+      "created_at": "2026-07-02T15:22:09+00:00"
+    },
+    {
+      "model_key": "qwen35-4b",
+      "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 1,
+      "pp_n": 489,
+      "pp_ms": 1151.806,
+      "pp_tps": 424.6,
+      "tg_n": 128,
+      "tg_ms": 5143.292,
+      "tg_tps": 24.9,
+      "vram_used_gib": 12.15,
+      "gtt_used_gib": 0.33,
+      "created_at": "2026-07-02T15:22:16+00:00"
+    },
+    {
+      "model_key": "qwen35-4b",
+      "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+      "llamacpp_build": "b9859",
+      "np": 1,
+      "rep": 2,
+      "pp_n": 489,
+      "pp_ms": 1148.15,
+      "pp_tps": 425.9,
+      "tg_n": 128,
+      "tg_ms": 5136.353,
+      "tg_tps": 24.9,
+      "vram_used_gib": 12.15,
+      "gtt_used_gib": 0.33,
+      "created_at": "2026-07-02T15:22:22+00:00"
+    }
+  ],
+  "created_at": "2026-07-02T15:22:23+00:00"
+}

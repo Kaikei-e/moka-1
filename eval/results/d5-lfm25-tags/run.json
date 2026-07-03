@@ -1,0 +1,14 @@
+{
+  "run_id": "d5-lfm25-tags",
+  "model_key": "lfm25",
+  "model_hf": "LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M",
+  "task": "tags",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "e1acab6d872599cb87aca17bff31f51fb8f7abfad5d518f2eb8be29ee68eb596",
+  "n_items": 30,
+  "load_time_s": 5.1,
+  "started_at": "2026-07-02T16:03:48+00:00"
+}

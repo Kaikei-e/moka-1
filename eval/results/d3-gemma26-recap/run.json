@@ -1,0 +1,14 @@
+{
+  "run_id": "d3-gemma26-recap",
+  "model_key": "gemma4-26b",
+  "model_hf": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+  "task": "recap",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "1d539645fc8d5987c656f53a216dfe6d90b4fd162bd02849a4ebdf5667a8e610",
+  "n_items": 3,
+  "load_time_s": 23.2,
+  "started_at": "2026-07-02T16:39:55+00:00"
+}
