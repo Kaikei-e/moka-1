@@ -126,10 +126,12 @@ services:
       - "992" # render(コンテナ /etc/group に render が無いのでホストの GID 数値で。getent group render)
     environment:
       LLAMA_CACHE: /models # -hf の自動 DL 先を bind mount へ
-    # 高速パス: LFM2.5-8B-A1B Q4_K_M(tenets §3.3)。提案層・集約層のモデルは M1 以降で編成
+    # 高速パス: Qwen3.5-4B Q4_K_M(品質A/BでLFM2.5に p=0.043 で勝ち・実効2.2倍速、ADR00007)。
+    # thinking はリクエスト側 chat_template_kwargs {"enable_thinking": false} で無効化する。
+    # 提案層・集約層のモデルは M1 以降で編成
     command: >-
-      -hf LiquidAI/LFM2.5-8B-A1B-GGUF:Q4_K_M
-      --host 0.0.0.0 --port 8081 -ngl 99
+      -hf unsloth/Qwen3.5-4B-GGUF:Q4_K_M
+      --host 0.0.0.0 --port 8081 -ngl 99 -c 8192
     ports:
       - "127.0.0.1:8081:8081" # eval/ とデバッグ用
     volumes:
