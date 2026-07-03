@@ -1,18 +1,69 @@
 <script lang="ts">
+	// 無限スクロール: 末尾のセンチネルが可視化したら articles/+server.ts から次ページを取る。
+	// SSR props(articles/nextCursor)が変わったら(例: 新規フィード登録後の再読み込み)、
+	// 積み上げた追加ページは破棄して1ページ目からやり直す — 重複や矛盾を避ける単純な方針
 	import { resolve } from '$app/paths';
 	import type { Article } from '$lib/api/schemas';
-	import { EMPTY_ARTICLES } from '$lib/copy';
+	import { EMPTY_ARTICLES, LOADING_MORE, LOAD_MORE_FAILED, RETRY_LOAD_MORE } from '$lib/copy';
 	import { formatDate } from '$lib/format';
+	import DripIndicator from './DripIndicator.svelte';
 
-	let { articles, currentId = null }: { articles: Article[]; currentId?: number | null } = $props();
+	let {
+		articles,
+		nextCursor = null,
+		currentId = null
+	}: { articles: Article[]; nextCursor?: string | null; currentId?: number | null } = $props();
+
+	// items/cursor はここでは初期値としてのみ props を読む(SSR の初期表示と一致させるため)。
+	// props が後から変わった場合の再同期は下の $effect が担う — 意図的な一回きりの参照
+	// svelte-ignore state_referenced_locally
+	let items = $state<Article[]>(articles);
+	// svelte-ignore state_referenced_locally
+	let cursor = $state<string | null>(nextCursor);
+	let loading = $state(false);
+	let failed = $state(false);
+	let sentinel = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		items = articles;
+		cursor = nextCursor;
+		failed = false;
+	});
+
+	async function loadMore() {
+		if (loading || cursor === null) return;
+		loading = true;
+		failed = false;
+		try {
+			const res = await fetch(`/articles?cursor=${encodeURIComponent(cursor)}`);
+			if (!res.ok) throw new Error(`load more articles: ${res.status}`);
+			const body = await res.json();
+			items = [...items, ...body.articles];
+			cursor = body.next_cursor;
+		} catch {
+			failed = true;
+		} finally {
+			loading = false;
+		}
+	}
+
+	$effect(() => {
+		if (!sentinel) return;
+		const el = sentinel;
+		const observer = new IntersectionObserver((entries) => {
+			if (entries[0]?.isIntersecting) void loadMore();
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	});
 </script>
 
-{#if articles.length === 0}
+{#if items.length === 0}
 	<p class="empty">{EMPTY_ARTICLES}</p>
 {:else}
 	<nav aria-label="記事リスト">
 		<ul class="articles">
-			{#each articles as a (a.id)}
+			{#each items as a (a.id)}
 				<li>
 					<a
 						href={resolve('/articles/[id]', { id: String(a.id) })}
@@ -27,6 +78,25 @@
 			{/each}
 		</ul>
 	</nav>
+	{#if cursor !== null}
+		<div
+			class="sentinel"
+			bind:this={sentinel}
+			data-testid="article-list-sentinel"
+			aria-hidden="true"
+		></div>
+	{/if}
+	{#if loading}
+		<div class="loading-more">
+			<DripIndicator label={LOADING_MORE} />
+		</div>
+	{/if}
+	{#if failed}
+		<div class="load-more-failed">
+			<p role="alert">{LOAD_MORE_FAILED}</p>
+			<button type="button" onclick={loadMore}>{RETRY_LOAD_MORE}</button>
+		</div>
+	{/if}
 {/if}
 
 <style>
@@ -64,5 +134,29 @@
 		margin-top: 2px;
 		font: 400 12px/1.6 var(--font-ui);
 		color: var(--konnezu);
+	}
+	.sentinel {
+		height: 1px;
+	}
+	.loading-more {
+		padding: 12px 16px;
+	}
+	.load-more-failed {
+		padding: 12px 16px;
+	}
+	.load-more-failed p {
+		margin: 0 0 8px;
+		font: 400 12px/1.6 var(--font-ui);
+		color: var(--konnezu);
+	}
+	.load-more-failed button {
+		min-height: 44px;
+		padding: 0 14px;
+		border: 1px solid var(--hatoba);
+		border-radius: var(--radius-control);
+		background: var(--geppaku);
+		color: var(--kon);
+		font: 500 12px/1 var(--font-ui);
+		cursor: pointer;
 	}
 </style>

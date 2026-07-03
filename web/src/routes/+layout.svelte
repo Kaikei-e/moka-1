@@ -53,7 +53,7 @@
 		{#if data.listUnavailable}
 			<p class="side-note">{LIST_UNAVAILABLE}</p>
 		{:else}
-			<ArticleList articles={data.articles} {currentId} />
+			<ArticleList articles={data.articles} nextCursor={data.nextCursor} {currentId} />
 			{#if data.articles.length === 0}
 				<div class="side-register">
 					<FeedRegisterForm />

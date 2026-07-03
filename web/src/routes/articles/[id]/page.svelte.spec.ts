@@ -26,8 +26,13 @@ const otherArticle = {
 };
 
 // layout data(サイドバーの記事一覧)も PageProps.data に合流するのでテストにも含める
-const pageData = { articles: [], listUnavailable: false, article };
-const otherPageData = { articles: [], listUnavailable: false, article: otherArticle };
+const pageData = { articles: [], nextCursor: null, listUnavailable: false, article };
+const otherPageData = {
+	articles: [],
+	nextCursor: null,
+	listUnavailable: false,
+	article: otherArticle
+};
 
 function jsonResponse(status: number, body: unknown) {
 	return new Response(JSON.stringify(body), {

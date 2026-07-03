@@ -12,3 +12,6 @@ export const FETCH_FULLTEXT = '全文を取り寄せる';
 export const FETCHING_FULLTEXT = '取り寄せています';
 export const SUMMARIZING = '要約しています';
 export const SUMMARIZE = '要約する';
+export const LOADING_MORE = '続きを読み込んでいます';
+export const LOAD_MORE_FAILED = '続きを読み込めませんでした';
+export const RETRY_LOAD_MORE = '再試行する';
