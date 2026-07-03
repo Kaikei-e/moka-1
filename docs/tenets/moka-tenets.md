@@ -94,7 +94,7 @@ loop:
 
 ### 3.3 LLM編成
 
-開発機(Ryzen AI 9 HX370 / 物理64GB RAM / iGPU **48GiB** carve-out割り当て + GTT 7.6GiB、sysfs実測 2026-07)の gfx1150 は ROCm 非対応かつ Vulkan が優位のため、**バックエンドは Vulkan 固定**。実効GPUメモリは carve-out+GTT ≒ 55.6GiB(APUではGTTスピルしてもほぼ同速)。**ただしホスト側RAMは残り16GB**であり、21GB級GGUFのページキャッシュが成立しない=スワップ枠のロードは毎回ディスク律速になる点に注意(改善案: carve-out最小+`amdgpu.gttsize`大盛り構成 — eval/results/research/uma-vram.json)。
+開発機(Ryzen AI 9 HX370 / 物理64GB RAM / iGPU carve-out 4GiB + GTT 48GiB、[[ADR00009]]で移行済み)の gfx1150 は ROCm 非対応かつ Vulkan が優位のため、**バックエンドは Vulkan 固定**。実効GPUメモリは carve-out+GTT ≒ 52GiB(APUではGTTも同速 — 移行前後の実測で常駐下tg劣化1〜2%)。ホスト可用RAMは約55GBあり、21GB級GGUFもページキャッシュに乗るためスワップ枠のロードは2回目以降 ~7秒。
 
 | 役割 | モデル(確定 — [[ADR00007]]/[[ADR00008]]) | 常駐 | 用途 |
 |---|---|---|---|

@@ -2,10 +2,10 @@
   "model_key": "qwen36-35b",
   "model_hf": "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_XL",
   "load_times_s": [
-    39.3,
-    42.2,
-    38.3
+    18.2,
+    7.0,
+    7.0
   ],
   "note": "1回目=コールド寄り、以降=ページキャッシュ次第(ホストRAM16GB)",
-  "created_at": "2026-07-02T15:32:59+00:00"
+  "created_at": "2026-07-03T01:14:15+00:00"
 }

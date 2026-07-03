@@ -4,66 +4,66 @@
       "step": "baseline",
       "ctx": 8192,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 254349312,
-        "gtt_total": 8177864704,
-        "gtt_used": 47984640,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 256696320,
+        "gtt_total": 51539607552,
+        "gtt_used": 50081792,
+        "vis_vram_total": 4294967296
       }
     },
     {
       "step": "+lfm25",
-      "load_time_s": 3.1,
+      "load_time_s": 6.1,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 5567741952,
-        "gtt_total": 8177864704,
-        "gtt_used": 67981312,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 3482292224,
+        "gtt_total": 51539607552,
+        "gtt_used": 2157875200,
+        "vis_vram_total": 4294967296
       }
     },
     {
       "step": "+qwen35-4b",
-      "load_time_s": 5.0,
+      "load_time_s": 3.0,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 9774985216,
-        "gtt_total": 8177864704,
-        "gtt_used": 92594176,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 4284645376,
+        "gtt_total": 51539607552,
+        "gtt_used": 5587390464,
+        "vis_vram_total": 4294967296
       }
     },
     {
       "step": "+gemma4-e4b",
       "load_time_s": 7.0,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 14030303232,
-        "gtt_total": 8177864704,
-        "gtt_used": 142172160,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 4286058496,
+        "gtt_total": 51539607552,
+        "gtt_used": 9890828288,
+        "vis_vram_total": 4294967296
       }
     },
     {
       "step": "+gptoss20b",
-      "load_time_s": 20.1,
+      "load_time_s": 11.0,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 25839243264,
-        "gtt_total": 8177864704,
-        "gtt_used": 168091648,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 4286541824,
+        "gtt_total": 51539607552,
+        "gtt_used": 21725204480,
+        "vis_vram_total": 4294967296
       }
     },
     {
       "step": "+qwen36-35b",
-      "load_time_s": 38.2,
+      "load_time_s": 34.4,
       "mem": {
-        "vram_total": 51539607552,
-        "vram_used": 49328070656,
-        "gtt_total": 8177864704,
-        "gtt_used": 191197184,
-        "vis_vram_total": 51539607552
+        "vram_total": 4294967296,
+        "vram_used": 4293828608,
+        "gtt_total": 51539607552,
+        "gtt_used": 45248081920,
+        "vis_vram_total": 4294967296
       }
     },
     {
@@ -76,14 +76,14 @@
           "np": 1,
           "rep": 0,
           "pp_n": 599,
-          "pp_ms": 632.03,
-          "pp_tps": 947.7,
+          "pp_ms": 657.709,
+          "pp_tps": 910.7,
           "tg_n": 128,
-          "tg_ms": 1894.192,
-          "tg_tps": 67.6,
-          "vram_used_gib": 45.94,
-          "gtt_used_gib": 0.19,
-          "created_at": "2026-07-03T00:36:15+00:00"
+          "tg_ms": 1927.78,
+          "tg_tps": 66.4,
+          "vram_used_gib": 4.0,
+          "gtt_used_gib": 42.15,
+          "created_at": "2026-07-03T01:13:19+00:00"
         },
         {
           "model_key": "lfm25",
@@ -92,14 +92,14 @@
           "np": 1,
           "rep": 1,
           "pp_n": 599,
-          "pp_ms": 633.767,
-          "pp_tps": 945.1,
+          "pp_ms": 653.151,
+          "pp_tps": 917.1,
           "tg_n": 128,
-          "tg_ms": 1898.615,
-          "tg_tps": 67.4,
-          "vram_used_gib": 45.94,
-          "gtt_used_gib": 0.19,
-          "created_at": "2026-07-03T00:36:18+00:00"
+          "tg_ms": 1914.104,
+          "tg_tps": 66.9,
+          "vram_used_gib": 4.0,
+          "gtt_used_gib": 42.15,
+          "created_at": "2026-07-03T01:13:21+00:00"
         }
       ]
     },
@@ -113,14 +113,14 @@
           "np": 1,
           "rep": 0,
           "pp_n": 489,
-          "pp_ms": 1645.557,
-          "pp_tps": 297.2,
+          "pp_ms": 1537.871,
+          "pp_tps": 318.0,
           "tg_n": 128,
-          "tg_ms": 5475.885,
-          "tg_tps": 23.4,
-          "vram_used_gib": 45.94,
-          "gtt_used_gib": 0.21,
-          "created_at": "2026-07-03T00:36:28+00:00"
+          "tg_ms": 5581.098,
+          "tg_tps": 22.9,
+          "vram_used_gib": 4.0,
+          "gtt_used_gib": 42.18,
+          "created_at": "2026-07-03T01:13:31+00:00"
         },
         {
           "model_key": "qwen36-35b",
@@ -129,17 +129,17 @@
           "np": 1,
           "rep": 1,
           "pp_n": 489,
-          "pp_ms": 1654.293,
-          "pp_tps": 295.6,
+          "pp_ms": 1532.884,
+          "pp_tps": 319.0,
           "tg_n": 128,
-          "tg_ms": 5504.903,
-          "tg_tps": 23.3,
-          "vram_used_gib": 45.94,
-          "gtt_used_gib": 0.21,
-          "created_at": "2026-07-03T00:36:35+00:00"
+          "tg_ms": 5596.847,
+          "tg_tps": 22.9,
+          "vram_used_gib": 4.0,
+          "gtt_used_gib": 42.18,
+          "created_at": "2026-07-03T01:13:38+00:00"
         }
       ]
     }
   ],
-  "created_at": "2026-07-03T00:36:38+00:00"
+  "created_at": "2026-07-03T01:13:41+00:00"
 }
