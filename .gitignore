@@ -21,3 +21,6 @@ eval/results/server-logs/
 # Python バイトコード(eval/)— 絶対パスを内包するためコミット禁止
 __pycache__/
 *.pyc
+
+# E2E(CI が --report-junit で出力する Hurl レポート)
+e2e/hurl/reports/

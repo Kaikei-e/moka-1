@@ -7,7 +7,9 @@ export default defineConfig({
 	fullyParallel: false,
 	workers: 1, // DB 依存シナリオ(登録 → 一覧反映)なので直列
 	use: {
-		baseURL: process.env.E2E_WEB_URL ?? 'http://localhost:3000'
+		baseURL: process.env.E2E_WEB_URL ?? 'http://localhost:3000',
+		trace: 'retain-on-failure'
 	},
-	reporter: [['list']]
+	// CI では list に加えて html レポートを出す(失敗時に artifact として回収する)
+	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']]
 });
