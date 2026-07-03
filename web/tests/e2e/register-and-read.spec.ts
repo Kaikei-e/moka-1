@@ -26,18 +26,22 @@ test('空状態のホームからフィードを登録すると記事が並ぶ',
 	await expect(articleLinks.first()).toHaveText(/Third article/);
 });
 
-test('記事を選ぶと読書ビューが開き、AI 要素は準備中の給仕として現れる', async ({ page }) => {
+test('記事を選ぶと読書ビューが開き、moka の要約が運ばれてくる', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('link', { name: 'Third article' }).click();
 
 	// 本文(記事の声)
 	await expect(page.getByRole('heading', { name: 'Third article' })).toBeVisible();
 
-	// 要約カード: 存在と形をアサートし、生成内容の文言には依存しない
+	// 要約カード: 明示ボタンのみが引き金(全文取り寄せと同じ作法、自動生成しない)。
+	// 存在と形をアサートし、生成内容の文言には依存しない
 	await expect(page.getByText('moka による要約')).toBeVisible();
-	await expect(page.getByTestId('summary-drip')).toBeVisible();
+	await page.getByRole('button', { name: '要約する' }).click();
+	const summaryText = page.getByTestId('summary-text');
+	await expect(summaryText).toBeVisible({ timeout: 20_000 });
+	await expect(summaryText).not.toHaveText('');
 
-	// Q&A 入力バー
+	// Q&A 入力バー(こちらは M2 まで準備中のまま)
 	await expect(page.getByPlaceholder('この記事について訊く…')).toBeVisible();
 
 	// 対訳へ切り替えると未訳段落のドリップが段落位置に置かれる(§5.3)

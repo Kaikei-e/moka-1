@@ -19,6 +19,7 @@ import (
 	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
 	"github.com/Kaikei-e/moka-1/core/internal/httpapi"
 	"github.com/Kaikei-e/moka-1/core/internal/store"
+	"github.com/Kaikei-e/moka-1/core/internal/summarize"
 )
 
 const listenAddr = ":8080"
@@ -54,10 +55,12 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	validator := feed.NewURLValidator(allowPrivate)
 	registrar := feed.NewRegistrar(st, feed.NewHTTPFetcher(validator), validator, logger)
 	fullTexts := fulltext.NewService(st, fulltext.NewHTTPFetcher(validator), fulltext.NewTrafilaturaExtractor(), validator)
+	completer := summarize.NewHTTPCompleter(os.Getenv("LLM_BASE_URL"), &http.Client{Timeout: 90 * time.Second})
+	summarizer := summarize.NewService(st, st, completer, logger)
 
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           httpapi.NewMux(registrar, st, st, st, fullTexts),
+		Handler:           httpapi.NewMux(registrar, st, st, st, fullTexts, summarizer),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

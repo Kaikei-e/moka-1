@@ -93,7 +93,7 @@
 		{/if}
 	</header>
 
-	<SummaryCard />
+	<SummaryCard articleId={data.article.id} />
 
 	{#if taiyaku}
 		<div class="pairs">

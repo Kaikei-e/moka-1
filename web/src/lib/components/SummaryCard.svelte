@@ -1,8 +1,44 @@
 <script lang="ts">
 	// 要約カード(DESIGN_LANGUAGE §8.1)。AI の声なので fujinezu 面 + ゴシック、印は金泥。
-	// llm 連携までは正直に「準備ができていない」ドリップを常駐させる(偽の要約を捏造しない)
+	// 全文取り寄せ(§5.3)と同じ作法: 明示ボタンのみが引き金(自動取得しない)。
+	// moka-core 側は冪等なので、既に生成済みなら再生成せず保存済みの要約をそのまま返す。
+	//
+	// SvelteKit は同一ルート内の遷移でこのコンポーネントインスタンスを再利用するため、
+	// articleId の変化を検知して状態をリセットする(記事ごとにボタンから出し直す)。
 	import DripIndicator from './DripIndicator.svelte';
-	import { SUMMARY_PENDING } from '$lib/copy';
+	import { SUMMARIZE, SUMMARIZING } from '$lib/copy';
+
+	let { articleId }: { articleId: number } = $props();
+
+	let text = $state<string | null>(null);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+
+	$effect(() => {
+		const id = articleId; // 依存の確立(記事切り替えのたびにリセットする)
+		void id;
+		text = null;
+		loading = false;
+		error = null;
+	});
+
+	async function summarize() {
+		loading = true;
+		error = null;
+		try {
+			const res = await fetch(`/articles/${articleId}/summary`, { method: 'POST' });
+			const body = await res.json();
+			if (!res.ok) {
+				error = body.error ?? '要約に失敗しました。再試行してください';
+				return;
+			}
+			text = body.summary.text;
+		} catch {
+			error = '要約に失敗しました。再試行してください';
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 <section class="summary-card">
@@ -17,7 +53,21 @@
 		</svg>
 		moka による要約
 	</h2>
-	<DripIndicator label={SUMMARY_PENDING} testid="summary-drip" />
+	{#if text === null && !loading}
+		<button class="summarize-button" onclick={summarize}>{SUMMARIZE}</button>
+	{/if}
+	{#if loading}
+		<DripIndicator label={SUMMARIZING} testid="summary-drip" />
+	{/if}
+	{#if error}
+		<p class="summary-error" role="alert">
+			<span aria-hidden="true">⚠</span>
+			失敗: {error}
+		</p>
+	{/if}
+	{#if text}
+		<p class="summary-text" data-testid="summary-text">{text}</p>
+	{/if}
 </section>
 
 <style>
@@ -34,5 +84,29 @@
 		margin: 0 0 10px;
 		font: 500 11px/1.5 var(--font-ui);
 		color: var(--kindei); /* moka の印 = 金泥 */
+	}
+	.summary-text {
+		margin: 0;
+		font: 400 13px/1.8 var(--font-ui);
+		color: var(--kon);
+	}
+	/* エラー = 紺紙金泥ブロック(DESIGN_LANGUAGE §2.4) */
+	.summary-error {
+		margin: 0 0 10px;
+		padding: 12px 14px;
+		border-radius: var(--radius-card);
+		background: var(--kon);
+		color: var(--kindei-bright);
+		font: 400 12px/1.6 var(--font-ui);
+	}
+	.summarize-button {
+		min-height: 44px;
+		padding: 0 14px;
+		border: 1px solid var(--hatoba);
+		border-radius: var(--radius-control);
+		background: var(--geppaku);
+		color: var(--kon);
+		font: 500 12px/1 var(--font-ui);
+		cursor: pointer;
 	}
 </style>

@@ -6,9 +6,11 @@ import {
 	feedsResponseSchema,
 	fullTextResponseSchema,
 	registerResponseSchema,
+	summaryResponseSchema,
 	type Article,
 	type Feed,
-	type FullText
+	type FullText,
+	type Summary
 } from '$lib/api/schemas';
 
 const baseURL = () => process.env.MOKA_CORE_URL ?? 'http://localhost:8080';
@@ -93,5 +95,35 @@ export async function fetchFullText(
 		ok: false,
 		status: res.status,
 		message: fullTextErrorMessages[res.status] ?? '取り寄せに失敗しました。再試行してください'
+	};
+}
+
+export type SummaryResult =
+	{ ok: true; created: boolean; summary: Summary } | { ok: false; status: number; message: string };
+
+// moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)
+const summarizeErrorMessages: Record<number, string> = {
+	400: 'この記事は要約できません',
+	404: '記事が見つかりません',
+	422: '要約の生成に失敗しました。再試行してください',
+	502: '要約に失敗しました。時間をおいて再試行してください'
+};
+
+// 要約は冪等(moka-core 側で保存済みなら再生成しない) — 新規 201 / 既存 200
+export async function summarizeArticle(
+	fetchFn: typeof fetch,
+	articleId: number
+): Promise<SummaryResult> {
+	const res = await fetchFn(`${baseURL()}/api/v1/articles/${articleId}/summary`, {
+		method: 'POST'
+	});
+	if (res.status === 200 || res.status === 201) {
+		const body = summaryResponseSchema.parse(await res.json());
+		return { ok: true, created: res.status === 201, summary: body.summary };
+	}
+	return {
+		ok: false,
+		status: res.status,
+		message: summarizeErrorMessages[res.status] ?? '要約に失敗しました。再試行してください'
 	};
 }

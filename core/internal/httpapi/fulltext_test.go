@@ -44,7 +44,7 @@ func TestHandleFetchFullText(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/fulltext", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusCreated, rec.Code)
 		assert.Equal(t, int64(7), fetcher.gotArticle)
@@ -68,7 +68,7 @@ func TestHandleFetchFullText(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/fulltext", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
@@ -79,7 +79,7 @@ func TestHandleFetchFullText(t *testing.T) {
 		fetcher := &fakeFullTextFetcher{}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/999999/fulltext", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, fetcher).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, fetcher, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Zero(t, fetcher.gotArticle)
@@ -90,7 +90,7 @@ func TestHandleFetchFullText(t *testing.T) {
 
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/not-a-number/fulltext", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -103,7 +103,7 @@ func TestHandleFetchFullText(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/fulltext", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
@@ -131,7 +131,7 @@ func TestHandleFetchFullText(t *testing.T) {
 			}}
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/fulltext", nil)
 			rec := httptest.NewRecorder()
-			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher).ServeHTTP(rec, req)
+			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, fetcher, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 		})

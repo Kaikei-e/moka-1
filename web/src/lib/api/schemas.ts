@@ -25,6 +25,13 @@ export const fullTextSchema = z.object({
 	fetched_at: z.string()
 });
 
+export const summarySchema = z.object({
+	article_id: z.number(),
+	text: z.string(),
+	model_meta: z.record(z.string(), z.unknown()),
+	created_at: z.string()
+});
+
 export const articlesResponseSchema = z.object({
 	articles: z.array(articleSchema),
 	next_cursor: z.string().nullable() // カーソルページング。null = 終端
@@ -36,7 +43,9 @@ export const registerResponseSchema = z.object({
 	inserted_articles: z.number()
 });
 export const fullTextResponseSchema = z.object({ fulltext: fullTextSchema });
+export const summaryResponseSchema = z.object({ summary: summarySchema });
 
 export type Feed = z.infer<typeof feedSchema>;
 export type Article = z.infer<typeof articleSchema>;
 export type FullText = z.infer<typeof fullTextSchema>;
+export type Summary = z.infer<typeof summarySchema>;

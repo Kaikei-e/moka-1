@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { fetchFullText, getArticle, listArticles, listFeeds, registerFeed } from './core';
+import {
+	fetchFullText,
+	getArticle,
+	listArticles,
+	listFeeds,
+	registerFeed,
+	summarizeArticle
+} from './core';
 
 const article = {
 	id: 7,
@@ -121,6 +128,36 @@ describe('fetchFullText', () => {
 		[500, '取り寄せに失敗しました。再試行してください']
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await fetchFullText(fetchStub(status, { error: 'x' }), 7);
+		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('summarizeArticle', () => {
+	const summary = {
+		article_id: 7,
+		text: '要約テキスト',
+		model_meta: { model: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M' },
+		created_at: '2026-07-01T09:00:00Z'
+	};
+
+	it('maps 201 to a created result', async () => {
+		const got = await summarizeArticle(fetchStub(201, { summary }), 7);
+		expect(got).toEqual({ ok: true, created: true, summary });
+	});
+
+	it('maps 200 to an already-summarized result', async () => {
+		const got = await summarizeArticle(fetchStub(200, { summary }), 7);
+		expect(got).toMatchObject({ ok: true, created: false });
+	});
+
+	it.each([
+		[400, 'この記事は要約できません'],
+		[404, '記事が見つかりません'],
+		[422, '要約の生成に失敗しました。再試行してください'],
+		[502, '要約に失敗しました。時間をおいて再試行してください'],
+		[500, '要約に失敗しました。再試行してください']
+	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
+		const got = await summarizeArticle(fetchStub(status, { error: 'x' }), 7);
 		expect(got).toEqual({ ok: false, status, message });
 	});
 });

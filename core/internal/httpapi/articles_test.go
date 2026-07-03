@@ -100,7 +100,7 @@ func TestHandleListArticles(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodGet, "/api/v1/articles"+tt.query, nil)
 			rec := httptest.NewRecorder()
-			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			if tt.wantStatus == http.StatusOK && tt.list == nil {
@@ -124,7 +124,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?cursor="+cur.Encode(), nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.NotNil(t, gotCursor)
@@ -143,7 +143,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?limit=2", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -167,7 +167,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?limit=2", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got map[string]json.RawMessage
@@ -182,7 +182,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"articles": [], "next_cursor": null}`, rec.Body.String())
@@ -197,7 +197,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -236,7 +236,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/7", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -253,7 +253,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/999999", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		var got map[string]string
@@ -267,7 +267,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/not-a-number", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -281,7 +281,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/7", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})

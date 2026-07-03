@@ -65,6 +65,12 @@ func TestNewMux(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
+			name:       "summary rejects GET",
+			method:     http.MethodGet,
+			path:       "/api/v1/articles/7/summary",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "unknown path returns 404",
 			method:     http.MethodGet,
 			path:       "/nope",
@@ -72,7 +78,8 @@ func TestNewMux(t *testing.T) {
 		},
 	}
 
-	mux := NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{})
+	mux := NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
+		&fakeSummarizer{})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

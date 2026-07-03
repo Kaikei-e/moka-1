@@ -29,17 +29,34 @@ const otherArticle = {
 const pageData = { articles: [], listUnavailable: false, article };
 const otherPageData = { articles: [], listUnavailable: false, article: otherArticle };
 
+function jsonResponse(status: number, body: unknown) {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
+}
+
 function deferredResponse(status: number, body: unknown) {
 	let resolve!: () => void;
 	const gate = new Promise<void>((r) => (resolve = r));
-	const promise = gate.then(
-		() =>
-			new Response(JSON.stringify(body), {
-				status,
-				headers: { 'Content-Type': 'application/json' }
-			})
-	);
+	const promise = gate.then(() => jsonResponse(status, body));
 	return { promise, resolve };
+}
+
+// 全文取り寄せ・要約はどちらも明示ボタンが引き金(自動取得しない)で、独立したボタンから
+// 別々の URL を叩く。同じ Page 内で両方を検証できるよう、呼び先を URL で振り分ける。
+function routeFetch(
+	overrides: Partial<{ fulltext: () => Promise<Response>; summary: () => Promise<Response> }> = {}
+) {
+	const fulltext =
+		overrides.fulltext ?? (() => Promise.reject(new Error('unmocked fulltext fetch')));
+	const summary = overrides.summary ?? (() => Promise.reject(new Error('unmocked summary fetch')));
+	return vi.fn((input: RequestInfo | URL) => {
+		const url = typeof input === 'string' ? input : input.toString();
+		if (url.includes('/fulltext')) return fulltext();
+		if (url.includes('/summary')) return summary();
+		return Promise.reject(new Error(`unmocked fetch: ${url}`));
+	});
 }
 
 afterEach(() => {
@@ -48,6 +65,7 @@ afterEach(() => {
 
 describe('articles/[id] reading view — 全文取り寄せ', () => {
 	it('shows the RSS-derived content and a fetch button before any retrieval', async () => {
+		vi.stubGlobal('fetch', routeFetch());
 		render(Page, { data: pageData });
 
 		await expect.element(page.getByText('概要の本文です。')).toBeVisible();
@@ -55,6 +73,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 	});
 
 	it('opens the original link in a new tab', async () => {
+		vi.stubGlobal('fetch', routeFetch());
 		render(Page, { data: pageData });
 
 		const link = page.getByRole('link', { name: '原文を開く' });
@@ -70,10 +89,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 				fetched_at: '2026-07-01T10:00:00Z'
 			}
 		});
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(() => promise)
-		);
+		vi.stubGlobal('fetch', routeFetch({ fulltext: () => promise }));
 
 		render(Page, { data: pageData });
 		await page.getByRole('button', { name: '全文を取り寄せる' }).click();
@@ -92,16 +108,10 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 	it('shows an inline failure block and keeps the retry button on error', async () => {
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(
-				async () =>
-					new Response(
-						JSON.stringify({ error: '取り寄せに失敗しました。時間をおいて再試行してください' }),
-						{
-							status: 502,
-							headers: { 'Content-Type': 'application/json' }
-						}
-					)
-			)
+			routeFetch({
+				fulltext: async () =>
+					jsonResponse(502, { error: '取り寄せに失敗しました。時間をおいて再試行してください' })
+			})
 		);
 
 		render(Page, { data: pageData });
@@ -114,6 +124,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 	});
 
 	it('switches to the new article body when navigating between articles (SvelteKit reuses the component instance)', async () => {
+		vi.stubGlobal('fetch', routeFetch());
 		const { rerender } = await render(Page, { data: pageData });
 		await expect.element(page.getByText('概要の本文です。')).toBeVisible();
 
@@ -132,10 +143,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 				fetched_at: '2026-07-01T10:00:00Z'
 			}
 		});
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(() => promise)
-		);
+		vi.stubGlobal('fetch', routeFetch({ fulltext: () => promise }));
 
 		const { rerender } = await render(Page, { data: pageData });
 		await page.getByRole('button', { name: '全文を取り寄せる' }).click();
@@ -158,10 +166,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 				fetched_at: '2026-07-01T10:00:00Z'
 			}
 		});
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(() => promise)
-		);
+		vi.stubGlobal('fetch', routeFetch({ fulltext: () => promise }));
 
 		render(Page, { data: pageData });
 		await page.getByRole('button', { name: '全文を取り寄せる' }).click();
@@ -181,10 +186,7 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 				fetched_at: '2026-07-01T10:00:00Z'
 			}
 		});
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(() => promise)
-		);
+		vi.stubGlobal('fetch', routeFetch({ fulltext: () => promise }));
 
 		const { container } = render(Page, { data: pageData });
 		await page.getByRole('button', { name: '全文を取り寄せる' }).click();
@@ -193,5 +195,33 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 		await expect.element(page.getByText('安全な本文')).toBeVisible();
 		expect(container.querySelector('script')).toBeNull();
 		expect(container.querySelector('[onclick]')).toBeNull();
+	});
+});
+
+describe('articles/[id] reading view — 要約(moka による濃縮)', () => {
+	it('shows a summarize button (no auto-fetch) that fetches independently of the fulltext button', async () => {
+		const summaryFetch = vi.fn(async () =>
+			jsonResponse(200, {
+				summary: {
+					article_id: 7,
+					text: '読書ビューに運ばれてきた要約',
+					model_meta: {},
+					created_at: '2026-07-01T09:00:00Z'
+				}
+			})
+		);
+		vi.stubGlobal('fetch', routeFetch({ summary: summaryFetch }));
+
+		render(Page, { data: pageData });
+
+		await expect.element(page.getByText('moka による要約')).toBeVisible();
+		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
+		expect(summaryFetch).not.toHaveBeenCalled();
+
+		await page.getByRole('button', { name: '要約する' }).click();
+
+		await expect
+			.element(page.getByTestId('summary-text'))
+			.toHaveTextContent('読書ビューに運ばれてきた要約');
 	});
 });
