@@ -1,0 +1,39 @@
+{
+  "decision": "promptab-summarize",
+  "n_pairs": 30,
+  "pair_level_wins": {
+    "qwen35-4b-promptA": 6,
+    "qwen35-4b-promptB": 18
+  },
+  "ties": 6,
+  "sign_test_p": 0.02266,
+  "winner": "qwen35-4b-promptB",
+  "per_lens": {
+    "faithfulness": {
+      "qwen35-4b-promptA": 8,
+      "qwen35-4b-promptB": 16,
+      "tie": 6
+    },
+    "coverage": {
+      "qwen35-4b-promptA": 7,
+      "qwen35-4b-promptB": 14,
+      "tie": 9
+    },
+    "conciseness": {
+      "qwen35-4b-promptA": 6,
+      "qwen35-4b-promptB": 16,
+      "tie": 8
+    },
+    "instruction": {
+      "qwen35-4b-promptA": 4,
+      "qwen35-4b-promptB": 8,
+      "tie": 18
+    }
+  },
+  "position_consistency": 1.0,
+  "judge_agreement": null,
+  "judges": [
+    "claude"
+  ],
+  "created_at": "2026-07-03T14:00:46+00:00"
+}

@@ -1,0 +1,15 @@
+{
+  "run_id": "promptab-a",
+  "model_key": "qwen35-4b-promptA",
+  "model_hf": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
+  "task": "summarize",
+  "llamacpp_build": "b9859",
+  "seeds": [
+    42
+  ],
+  "prompt_sha256": "0572afc7f4feefe7b3e367ae05c26d77cd489604abaede145e682f3c6fdb9985",
+  "prompt_path": "summarize_ja.txt",
+  "n_items": 30,
+  "load_time_s": 5.1,
+  "started_at": "2026-07-03T11:54:22+00:00"
+}
