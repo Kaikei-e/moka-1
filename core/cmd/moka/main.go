@@ -16,6 +16,7 @@ import (
 	"os/signal"
 
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
+	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
 	"github.com/Kaikei-e/moka-1/core/internal/httpapi"
 	"github.com/Kaikei-e/moka-1/core/internal/store"
 )
@@ -52,10 +53,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	allowPrivate, _ := strconv.ParseBool(os.Getenv("MOKA_FEED_ALLOW_PRIVATE"))
 	validator := feed.NewURLValidator(allowPrivate)
 	registrar := feed.NewRegistrar(st, feed.NewHTTPFetcher(validator), validator, logger)
+	fullTexts := fulltext.NewService(st, fulltext.NewHTTPFetcher(validator), fulltext.NewTrafilaturaExtractor(), validator)
 
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           httpapi.NewMux(registrar, st, st, st),
+		Handler:           httpapi.NewMux(registrar, st, st, st, fullTexts),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

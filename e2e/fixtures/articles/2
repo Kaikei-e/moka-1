@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Second article — Moka E2E Fixture</title>
+<meta name="author" content="Moka E2E">
+<meta property="article:published_time" content="2026-06-30T09:00:00Z">
+</head>
+<body>
+<nav><a href="/">Home</a> | <a href="/archive">Archive</a></nav>
+<header><h1>Moka E2E Fixture</h1></header>
+<article>
+<h1>Second article</h1>
+<p class="byline">By Moka E2E — 2026-06-30</p>
+<p>This is the full text of the second fixture article, deliberately longer and more detailed than the RSS description that ships in the feed.</p>
+<p>The second paragraph adds a concrete, deterministic sentence: the number seventeen appears here for assertions that need a stable anchor inside the extracted body.</p>
+<p>A closing paragraph wraps up the second fixture article and confirms that paragraph boundaries survive extraction.</p>
+</article>
+<aside class="promo"><p>Subscribe to our newsletter for more fixtures like this one.</p></aside>
+<footer><p>&copy; 2026 Moka E2E Fixture. All rights reserved.</p></footer>
+</body>
+</html>

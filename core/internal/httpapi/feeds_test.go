@@ -125,7 +125,7 @@ func TestHandleRegisterFeed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mux := NewMux(&fakeRegistrar{register: tt.register}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{})
+			mux := NewMux(&fakeRegistrar{register: tt.register}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{})
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/v1/feeds", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestHandleRegisterFeed(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodPost, "/api/v1/feeds", strings.NewReader(`{"url": "https://example.com/feed.xml"}`))
 		rec := httptest.NewRecorder()
-		NewMux(reg, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}).ServeHTTP(rec, req)
+		NewMux(reg, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusCreated, rec.Code)
 		var got map[string]json.RawMessage
@@ -197,7 +197,7 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -216,7 +216,7 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"feeds": []}`, rec.Body.String())
@@ -231,7 +231,7 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}).ServeHTTP(rec, req)
+		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})

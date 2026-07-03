@@ -1,0 +1,84 @@
+/* moka-1 実装トークン(DESIGN_LANGUAGE §9 v3「瑠璃と金泥」)。ライト専用 — ダーク値は持たない */
+:root {
+	/* color — 瑠璃の濃淡(淡 → 濃) */
+	--geppaku: #f4f6fb;
+	--kumoi: #edf0f7;
+	--fujinezu: #dfe4f1;
+	--hatoba: #c9cfe2;
+	--usuhanada: #94a0be;
+	--konnezu: #545c78;
+	--ruri: #3e4d8e;
+	--ruri-deep: #313e77;
+	--ruri-tint: #d6dbf0;
+	--kon: #1f2438;
+
+	/* color — 金泥(唯一の第二色相)。kindei-bright は kon 地の上のみ */
+	--kindei: #745a17;
+	--kindei-bright: #c9a227;
+
+	/* type */
+	--font-article: 'Shippori Mincho', serif;
+	--font-ui: 'Zen Kaku Gothic New', sans-serif;
+	--font-code: 'IBM Plex Mono', monospace;
+
+	/* layout */
+	--radius-control: 8px;
+	--radius-card: 12px;
+	--measure-ja: 38rem;
+	--sidebar-w: 280px;
+	--bp-desktop: 900px;
+
+	/* motion */
+	--dur-fast: 120ms;
+	--dur-base: 200ms;
+	--dur-calm: 300ms;
+	--ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--kumoi);
+	color: var(--kon);
+	font: 400 14px/1.8 var(--font-ui);
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: var(--ruri);
+	transition: color var(--dur-fast) var(--ease-calm);
+}
+
+a:hover {
+	color: var(--ruri-deep);
+}
+
+::placeholder {
+	color: var(--usuhanada);
+}
+
+/* 唯一許可されるシャドウ = フォーカスリング(§8.5) */
+:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--kumoi),
+		0 0 0 4px var(--ruri);
+}
+
+/* ドリップ含む全アニメーションを停止し、テキストのみで状態を伝える(§6.1) */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+	}
+}
