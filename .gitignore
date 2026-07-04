@@ -24,3 +24,7 @@ __pycache__/
 
 # E2E(CI が --report-junit で出力する Hurl レポート)
 e2e/hurl/reports/
+
+# E2E スケジューラ検証: scheduler_e2e.sh が v1/v2 からコピー・差し替えて配信する実体
+# (コミットするのは feed-scheduler-v1.xml / feed-scheduler-v2.xml 側)
+e2e/fixtures/feed-scheduler.xml

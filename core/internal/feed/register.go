@@ -23,9 +23,9 @@ type Fetcher interface {
 
 // Registrar はフィード登録ユースケース: 検証 → 取得 → 保存(冪等)。
 // interface にのみ依存し、具象は cmd/moka/main.go が注入する。
-// 注: 外部取得のグローバルレートリミッタ(≥5s 間隔、tenets §3.2)はスケジューラループ
-// 導入時に x/time/rate の単一 Limiter として入れる。ユーザー起点の同期登録 1 リクエスト
-// だけの現段階では入れない(予測で作らない)。
+// 注: 外部取得のグローバルレートリミッタ(≥5s 間隔、tenets §3.2 / §8 未決事項5)は
+// Scheduler 側が持つ(Scheduler.tickOnce)。ユーザー起点の同期登録(POST /api/v1/feeds)は
+// 1 リクエストなのでバーストの懸念が無く、Registrar 自体は無制限のまま呼ぶ。
 type Registrar struct {
 	store    Store
 	fetch    Fetcher

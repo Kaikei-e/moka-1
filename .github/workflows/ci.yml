@@ -198,6 +198,10 @@ jobs:
             --variable fixture_url=http://e2e-fixtures/feed.xml \
             --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
             e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
+      - name: scheduler e2e(常駐スケジューラの自律再取得を検証)
+        # 上記 hurl 群の後に走らせる — 独自フィードを追加登録するため、既存ファイルの
+        # 「ちょうどN件」前提の厳密なカウントアサーションを崩さない順序を守る
+        run: bash e2e/hurl/core/scheduler_e2e.sh
       - name: dump compose logs
         if: always()
         run: docker compose -f compose.yaml -f compose.e2e.yaml logs --no-color > compose-logs-hurl.txt

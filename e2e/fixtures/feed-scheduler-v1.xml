@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(スケジューラ検証用、v1)。scheduler_e2e.sh がこの内容を
+     feed-scheduler.xml としてコピーして配信し、後で v2 に差し替えて再取得を観測する。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Scheduler Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying the background scheduler autonomously re-fetches</description>
+    <item>
+      <title>Scheduler article 1</title>
+      <link>http://e2e-fixtures/articles/sched-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-sched:1</guid>
+      <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Body of the first scheduler fixture article.</description>
+    </item>
+  </channel>
+</rss>

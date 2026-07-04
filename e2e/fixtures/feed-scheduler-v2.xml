@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(スケジューラ検証用、v2)。v1 に記事を1件足した内容。
+     scheduler_e2e.sh がこれを feed-scheduler.xml に差し替え、スケジューラが自律的に
+     条件付き GET で再取得して urn:moka-e2e-sched:2 が現れることを検証する。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Scheduler Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying the background scheduler autonomously re-fetches</description>
+    <item>
+      <title>Scheduler article 1</title>
+      <link>http://e2e-fixtures/articles/sched-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-sched:1</guid>
+      <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Body of the first scheduler fixture article.</description>
+    </item>
+    <item>
+      <title>Scheduler article 2 (added after scheduler kicked in)</title>
+      <link>http://e2e-fixtures/articles/sched-2</link>
+      <guid isPermaLink="false">urn:moka-e2e-sched:2</guid>
+      <pubDate>Thu, 02 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Body of the second scheduler fixture article, appearing only after the swap.</description>
+    </item>
+  </channel>
+</rss>

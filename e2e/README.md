@@ -40,6 +40,10 @@ hurl --test --jobs 1 \
   --variable fixture_url=http://e2e-fixtures/feed.xml \
   --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
   e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
+
+# 4. 常駐スケジューラ(バックグラウンド自律取得)の検証は独自フィードを登録するので、
+# 上記の「ちょうどN件」前提の厳密なカウントアサーションを崩さないよう必ず最後に走らせる
+bash e2e/hurl/core/scheduler_e2e.sh
 ```
 
 ## Playwright(UI 層)
@@ -80,6 +84,8 @@ docker compose -f compose.yaml -f compose.e2e.yaml rm -f e2e-db e2e-migrate e2e-
   e2e 限定で `LLM_BASE_URL` を e2e-llm-mock へ向けている)
 - nginx は静的ファイルに ETag / Last-Modified を自動付与するので、再登録シナリオが
   条件付き GET(304)の経路を実際に通る
+- `MOKA_SCHEDULER_TICK_SECONDS=3`(compose.e2e.yaml のみ)。常駐スケジューラの due 判定
+  ポーリング間隔を短縮し、`scheduler_e2e.sh` の待ち時間を短くする(本番既定は60秒)
 - Playwright がフォームに入れる fixture URL は moka-core が docker ネットワーク内で解決する
   (ブラウザからは触らない)ので、ホスト側の名前解決は不要
 - CI では Hurl に `--report-junit reports/junit.xml` を付ける

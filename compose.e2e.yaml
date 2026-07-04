@@ -14,6 +14,9 @@ services:
       # 本物の llm は GPU(iGPU Vulkan passthrough)が要り GitHub-hosted runner では起動できない。
       # E2E は決定的なモックへ差し替える(e2e/mock-llm/mock_llm.py)
       LLM_BASE_URL: http://e2e-llm-mock:8081/v1
+      # スケジューラの due 判定ポーリング間隔を短縮(既定60秒のままだと scheduler_e2e.sh の
+      # ポーリング待ちが長くなりすぎる)
+      MOKA_SCHEDULER_TICK_SECONDS: "3"
     depends_on:
       e2e-db:
         condition: service_healthy

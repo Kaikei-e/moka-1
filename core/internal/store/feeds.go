@@ -87,6 +87,41 @@ func (s *Store) InsertFeedFetch(ctx context.Context, feedID int64, rec feed.Fetc
 	return nil
 }
 
+// DueFeeds は次回取得時刻(最新 feed_fetches.fetched_at + feeds.fetch_interval_seconds)を
+// 過ぎた、または一度も取得したことが無いフィードを返す(feed.DueFeedLister)。次回取得時刻は
+// 事前計算カラムを持たず、都度このクエリで導出する(schema.sql の feed_fetches コメント通り)。
+func (s *Store) DueFeeds(ctx context.Context) ([]feed.Feed, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT f.id, f.url, COALESCE(f.title, ''), f.created_at
+		FROM feeds f
+		LEFT JOIN LATERAL (
+			SELECT fetched_at FROM feed_fetches ff
+			WHERE ff.feed_id = f.id
+			ORDER BY ff.fetched_at DESC
+			LIMIT 1
+		) latest ON true
+		WHERE latest.fetched_at IS NULL
+		   OR latest.fetched_at <= now() - make_interval(secs => f.fetch_interval_seconds)
+		ORDER BY f.id`)
+	if err != nil {
+		return nil, fmt.Errorf("select due feeds: %w", err)
+	}
+	defer rows.Close()
+
+	var out []feed.Feed
+	for rows.Next() {
+		var f feed.Feed
+		if err := rows.Scan(&f.ID, &f.URL, &f.Title, &f.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan due feed: %w", err)
+		}
+		out = append(out, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate due feeds: %w", err)
+	}
+	return out, nil
+}
+
 // ListFeeds は登録済みフィードを新しい順に返す(httpapi.FeedLister)。
 func (s *Store) ListFeeds(ctx context.Context) ([]feed.Feed, error) {
 	rows, err := s.pool.Query(ctx,

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -57,6 +58,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	fullTexts := fulltext.NewService(st, fulltext.NewHTTPFetcher(validator), fulltext.NewTrafilaturaExtractor(), validator)
 	completer := summarize.NewHTTPCompleter(os.Getenv("LLM_BASE_URL"), &http.Client{Timeout: 90 * time.Second})
 	summarizer := summarize.NewService(st, st, completer, logger)
+	scheduler := feed.NewScheduler(st, registrar, schedulerTick(), logger)
 
 	server := &http.Server{
 		Addr:              listenAddr,
@@ -67,13 +69,17 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
-	go func() {
+	wg.Go(func() {
 		logger.Info("moka-core listening", "addr", listenAddr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("listen %s: %w", listenAddr, err)
 		}
-	}()
+	})
+	wg.Go(func() {
+		scheduler.Run(ctx)
+	})
 
 	select {
 	case err := <-errCh:
@@ -87,7 +93,18 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
+	wg.Wait() // scheduler.Run の終了(ctx.Done 経由)を待ってから pool.Close() へ抜ける
 	return nil
+}
+
+// schedulerTick は due 判定のポーリング間隔(既定60秒、MOKA_SCHEDULER_TICK_SECONDS で上書き可能)。
+func schedulerTick() time.Duration {
+	const def = 60 * time.Second
+	n, err := strconv.Atoi(os.Getenv("MOKA_SCHEDULER_TICK_SECONDS"))
+	if err != nil || n <= 0 {
+		return def
+	}
+	return time.Duration(n) * time.Second
 }
 
 // healthz は自プロセスの /healthz を叩いて exit code で返す(docker healthcheck 契約)。
