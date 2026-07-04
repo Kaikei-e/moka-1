@@ -13,20 +13,17 @@ import (
 var ErrInvalidCursor = errors.New("invalid article cursor")
 
 // ArticleCursor は記事一覧の keyset ページング位置(最後に返した記事の並びキー)。
-// 並びは published_at DESC NULLS LAST, id DESC — PublishedAt が nil のカーソルは
-// NULLS LAST の末尾領域(published_at IS NULL)を指す。
+// 並びは COALESCE(published_at, created_at) DESC, id DESC — published_at が無い
+// 記事は created_at(取得できた時刻)を代替の並びキーとするので、SortKey は常に非NULL。
 type ArticleCursor struct {
-	PublishedAt *time.Time
-	ID          int64
+	SortKey time.Time
+	ID      int64
 }
 
 // Encode は不透明なカーソル文字列(base64url)を返す。形式は "RFC3339Nano|id"。
 // クライアントに中身を契約させない — 復号は DecodeArticleCursor だけが知る。
 func (c ArticleCursor) Encode() string {
-	ts := ""
-	if c.PublishedAt != nil {
-		ts = c.PublishedAt.UTC().Format(time.RFC3339Nano)
-	}
+	ts := c.SortKey.UTC().Format(time.RFC3339Nano)
 	return base64.RawURLEncoding.EncodeToString([]byte(ts + "|" + strconv.FormatInt(c.ID, 10)))
 }
 
@@ -45,13 +42,12 @@ func DecodeArticleCursor(s string) (ArticleCursor, error) {
 	if err != nil {
 		return ArticleCursor{}, fmt.Errorf("%w: %s", ErrInvalidCursor, "bad id")
 	}
-	c := ArticleCursor{ID: id}
-	if ts != "" {
-		t, err := time.Parse(time.RFC3339Nano, ts)
-		if err != nil {
-			return ArticleCursor{}, fmt.Errorf("%w: %s", ErrInvalidCursor, "bad timestamp")
-		}
-		c.PublishedAt = &t
+	if ts == "" {
+		return ArticleCursor{}, fmt.Errorf("%w: %s", ErrInvalidCursor, "missing timestamp")
 	}
-	return c, nil
+	t, err := time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		return ArticleCursor{}, fmt.Errorf("%w: %s", ErrInvalidCursor, "bad timestamp")
+	}
+	return ArticleCursor{SortKey: t, ID: id}, nil
 }

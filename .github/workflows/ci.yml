@@ -188,13 +188,16 @@ jobs:
       - name: docker compose up (moka-core + e2e-fixtures)
         run: docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait --wait-timeout 180 moka-core e2e-fixtures
       - name: hurl
-        # summarize.hurl は本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る
+        # summarize.hurl は本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る。
+        # articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より
+        # 後に置く(NULL published_at 記事が fallback で全記事中最新になり得るため、順序を守る)
         run: |
           mkdir -p e2e/hurl/reports
           hurl --test --jobs 1 --report-junit e2e/hurl/reports/junit.xml \
             --variable host=http://localhost:8080 \
             --variable fixture_url=http://e2e-fixtures/feed.xml \
-            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl
+            --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
+            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
       - name: dump compose logs
         if: always()
         run: docker compose -f compose.yaml -f compose.e2e.yaml logs --no-color > compose-logs-hurl.txt

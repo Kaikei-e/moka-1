@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -11,28 +12,16 @@ import (
 func TestArticleCursorRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	t.Run("round-trips published_at and id", func(t *testing.T) {
+	t.Run("round-trips sort key and id", func(t *testing.T) {
 		t.Parallel()
 
 		ts := time.Date(2026, 7, 1, 9, 0, 0, 123456000, time.UTC) // timestamptz はマイクロ秒精度
-		c := ArticleCursor{PublishedAt: &ts, ID: 42}
+		c := ArticleCursor{SortKey: ts, ID: 42}
 
 		got, err := DecodeArticleCursor(c.Encode())
 		require.NoError(t, err)
-		require.NotNil(t, got.PublishedAt)
-		assert.True(t, got.PublishedAt.Equal(ts), "published_at はナノ秒まで等値であること")
+		assert.True(t, got.SortKey.Equal(ts), "sort key はナノ秒まで等値であること")
 		assert.Equal(t, int64(42), got.ID)
-	})
-
-	t.Run("round-trips a null published_at (NULLS LAST の末尾領域)", func(t *testing.T) {
-		t.Parallel()
-
-		c := ArticleCursor{PublishedAt: nil, ID: 7}
-
-		got, err := DecodeArticleCursor(c.Encode())
-		require.NoError(t, err)
-		assert.Nil(t, got.PublishedAt)
-		assert.Equal(t, int64(7), got.ID)
 	})
 }
 
@@ -57,4 +46,12 @@ func TestDecodeArticleCursorRejectsGarbage(t *testing.T) {
 			assert.ErrorIs(t, err, ErrInvalidCursor)
 		})
 	}
+
+	t.Run("old-format cursor with an empty timestamp (pre-SortKey PublishedAt==nil) is now invalid", func(t *testing.T) {
+		t.Parallel()
+
+		oldFormat := base64.RawURLEncoding.EncodeToString([]byte("|7"))
+		_, err := DecodeArticleCursor(oldFormat)
+		assert.ErrorIs(t, err, ErrInvalidCursor)
+	})
 }

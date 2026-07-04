@@ -79,7 +79,11 @@ func handleListArticles(articles ArticleLister) http.HandlerFunc {
 		var next *string
 		if len(list) == limit {
 			last := list[len(list)-1]
-			s := feed.ArticleCursor{PublishedAt: last.PublishedAt, ID: last.ID}.Encode()
+			sortKey := last.CreatedAt
+			if last.PublishedAt != nil {
+				sortKey = *last.PublishedAt
+			}
+			s := feed.ArticleCursor{SortKey: sortKey, ID: last.ID}.Encode()
 			next = &s
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"articles": list, "next_cursor": next})

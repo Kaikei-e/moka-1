@@ -33,11 +33,13 @@ docker volume rm moka_e2e-db-data 2>/dev/null || true
 # 2. e2e オーバーレイ込みで起動(fixture 配信 nginx + e2e-db + プライベート IP 許可 + 8080 公開)
 docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait moka-core e2e-fixtures
 
-# 3. Hurl 実行(DB 依存シナリオなので --jobs 1)。要約系(summarize.hurl)は e2e-llm-mock に対して走る
+# 3. Hurl 実行(DB 依存シナリオなので --jobs 1)。要約系(summarize.hurl)は e2e-llm-mock に対して走る。
+# articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より後に置く
 hurl --test --jobs 1 \
   --variable host=http://localhost:8080 \
   --variable fixture_url=http://e2e-fixtures/feed.xml \
-  e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl
+  --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
+  e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
 ```
 
 ## Playwright(UI 層)

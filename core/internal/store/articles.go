@@ -41,31 +41,27 @@ func (s *Store) InsertArticles(ctx context.Context, feedID int64, items []feed.I
 }
 
 // ListArticles は記事を新しい順に keyset ページングで返す(httpapi.ArticleLister)。
-// OFFSET は使わない — 深いページで読み飛ばし量が線形に伸びる。カーソルは
-// 並びキー (published_at DESC NULLS LAST, id DESC) の「最後に返した行」を指し、
-// その続きだけをインデックスレンジで引く。
+// OFFSET は使わない — 深いページで読み飛ばし量が線形に伸びる。並びキーは
+// COALESCE(published_at, created_at)(取得元の feed に pubDate が無い記事は
+// 取得できた時刻を代替キーにする) DESC, id DESC。カーソルはその「最後に返した行」
+// を指し、続きだけをインデックスレンジで引く。
 func (s *Store) ListArticles(ctx context.Context, limit int, cursor *feed.ArticleCursor) ([]feed.Article, error) {
 	const cols = `id, feed_id, guid, url, title, COALESCE(content, ''), published_at, created_at`
-	const order = ` ORDER BY published_at DESC NULLS LAST, id DESC LIMIT `
+	const sortKey = `COALESCE(published_at, created_at)`
+	const order = ` ORDER BY ` + sortKey + ` DESC, id DESC LIMIT `
 
 	var (
 		query string
 		args  []any
 	)
-	switch {
-	case cursor == nil:
+	if cursor == nil {
 		query = `SELECT ` + cols + ` FROM articles` + order + `$1`
 		args = []any{limit}
-	case cursor.PublishedAt != nil:
-		// 続き = より古い published_at、同時刻ならより小さい id、その先の NULL 領域
+	} else {
+		// 続き = より古い並びキー、同時刻ならより小さい id
 		query = `SELECT ` + cols + ` FROM articles
-		 WHERE published_at < $1 OR (published_at = $1 AND id < $2) OR published_at IS NULL` + order + `$3`
-		args = []any{*cursor.PublishedAt, cursor.ID, limit}
-	default:
-		// カーソルが NULL 領域内 — 以後は id だけで単調に進む
-		query = `SELECT ` + cols + ` FROM articles
-		 WHERE published_at IS NULL AND id < $1` + order + `$2`
-		args = []any{cursor.ID, limit}
+		 WHERE ` + sortKey + ` < $1 OR (` + sortKey + ` = $1 AND id < $2)` + order + `$3`
+		args = []any{cursor.SortKey, cursor.ID, limit}
 	}
 
 	rows, err := s.pool.Query(ctx, query, args...)

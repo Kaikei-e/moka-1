@@ -30,6 +30,11 @@ func articleAt(id int64, ts time.Time) feed.Article {
 	return feed.Article{ID: id, FeedID: 1, GUID: "urn:x", URL: "https://example.com", Title: "t", PublishedAt: &ts}
 }
 
+// articleAtCreated は published_at が無い記事(fallback ソートキー = created_at)を組み立てる。
+func articleAtCreated(id int64, createdAt time.Time) feed.Article {
+	return feed.Article{ID: id, FeedID: 1, GUID: "urn:x", URL: "https://example.com", Title: "t", CreatedAt: createdAt}
+}
+
 func TestHandleListArticles(t *testing.T) {
 	t.Parallel()
 
@@ -114,7 +119,7 @@ func TestHandleListArticles(t *testing.T) {
 		t.Parallel()
 
 		ts := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
-		cur := feed.ArticleCursor{PublishedAt: &ts, ID: 42}
+		cur := feed.ArticleCursor{SortKey: ts, ID: 42}
 
 		var gotCursor *feed.ArticleCursor
 		lister := &fakeLister{list: func(_ context.Context, _ int, cursor *feed.ArticleCursor) ([]feed.Article, error) {
@@ -129,8 +134,7 @@ func TestHandleListArticles(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.NotNil(t, gotCursor)
 		assert.Equal(t, int64(42), gotCursor.ID)
-		require.NotNil(t, gotCursor.PublishedAt)
-		assert.True(t, gotCursor.PublishedAt.Equal(ts))
+		assert.True(t, gotCursor.SortKey.Equal(ts))
 	})
 
 	t.Run("full page carries next_cursor pointing at the last article", func(t *testing.T) {
@@ -155,6 +159,31 @@ func TestHandleListArticles(t *testing.T) {
 		decoded, err := feed.DecodeArticleCursor(*got.NextCursor)
 		require.NoError(t, err)
 		assert.Equal(t, int64(2), decoded.ID, "next_cursor は最後の記事を指す")
+	})
+
+	t.Run("next_cursor falls back to created_at when the last article has no published_at", func(t *testing.T) {
+		t.Parallel()
+
+		createdAt := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
+		lister := &fakeLister{list: func(_ context.Context, _ int, _ *feed.ArticleCursor) ([]feed.Article, error) {
+			return []feed.Article{articleAtCreated(5, createdAt), articleAtCreated(4, createdAt)}, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodGet, "/api/v1/articles?limit=2", nil)
+		rec := httptest.NewRecorder()
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var got struct {
+			NextCursor *string `json:"next_cursor"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+		require.NotNil(t, got.NextCursor)
+
+		decoded, err := feed.DecodeArticleCursor(*got.NextCursor)
+		require.NoError(t, err)
+		assert.Equal(t, int64(4), decoded.ID)
+		assert.True(t, decoded.SortKey.Equal(createdAt), "published_at が無い記事は created_at を SortKey にする")
 	})
 
 	t.Run("short page ends pagination with a null next_cursor", func(t *testing.T) {

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ: pubDate を欠いた item を含むフィード。
+     published_at が NULL の記事の並び順 fallback(COALESCE(published_at, created_at))を検証する。
+     item 1 は pubDate 無し(published_at は NULL になり、登録時刻＝created_at で並ぶ想定)。
+     item 2/3 は既存の feed.xml(2026-06-07〜2026-07-01)と衝突しない過去日付にしてある。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Null PubDate Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed with a missing pubDate item for moka-core e2e tests</description>
+    <item>
+      <title>No date article</title>
+      <link>http://e2e-fixtures/articles/null-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-null:1</guid>
+      <description>Body of the no-date fixture article.</description>
+    </item>
+    <item>
+      <title>Old dated article 2</title>
+      <link>http://e2e-fixtures/articles/null-2</link>
+      <guid isPermaLink="false">urn:moka-e2e-null:2</guid>
+      <pubDate>Wed, 01 Apr 2026 09:00:00 GMT</pubDate>
+      <description>Body of the second null-pubdate-fixture article.</description>
+    </item>
+    <item>
+      <title>Old dated article 3</title>
+      <link>http://e2e-fixtures/articles/null-3</link>
+      <guid isPermaLink="false">urn:moka-e2e-null:3</guid>
+      <pubDate>Sun, 01 Mar 2026 09:00:00 GMT</pubDate>
+      <description>Body of the third null-pubdate-fixture article.</description>
+    </item>
+  </channel>
+</rss>

@@ -35,8 +35,10 @@ CREATE TABLE articles (
     UNIQUE (feed_id, guid)
 );
 
--- 記事一覧の keyset ページング用。並びキー (published_at DESC NULLS LAST, id DESC) と完全一致させる
-CREATE INDEX articles_published_at_idx ON articles (published_at DESC NULLS LAST, id DESC);
+-- 記事一覧の keyset ページング用。並びキー (COALESCE(published_at, created_at) DESC, id DESC) と
+-- 完全一致させる。published_at が無い記事(フィードに pubDate が無い)は取得できた時刻
+-- (created_at)を代替の並びキーとする(取得できた新しい記事が最下部に沈み続けない)
+CREATE INDEX articles_sort_key_idx ON articles ((COALESCE(published_at, created_at)) DESC, id DESC);
 
 -- タグ(正規化)。LLM 抽出結果の語彙
 CREATE TABLE tags (
