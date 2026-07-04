@@ -1,6 +1,9 @@
 <script lang="ts">
 	// 2ペイン骨格(DESIGN_LANGUAGE §4.3): サイドバー 280px + 読書カラム。
-	// ブレークポイントは 900px の1つだけ。モバイルはサイドバーをドロワーに収納
+	// ブレークポイントは 900px の1つだけ。モバイルはドロワーを持たず、記事リスト⇄読書ビューを
+	// マスター・ディテール式のプッシュ遷移(スライド)で切り替える一枚絵にする(v3.2.0)。
+	// ArticleList は常にマウントしたまま CSS で表示/非表示を切り替えるので、記事へ遷移しても
+	// スクロール位置・無限スクロールの読み込み状態がリセットされない。
 	import '@fontsource/shippori-mincho/400.css';
 	import '@fontsource/shippori-mincho/500.css';
 	import '@fontsource/zen-kaku-gothic-new/400.css';
@@ -14,15 +17,18 @@
 	import ArticleList from '$lib/components/ArticleList.svelte';
 	import FeedRegisterForm from '$lib/components/FeedRegisterForm.svelte';
 	import { LIST_UNAVAILABLE } from '$lib/copy';
+	import { topbarMode } from '$lib/mobile-nav';
 
 	let { data, children } = $props();
 
-	let drawerOpen = $state(false);
+	let menuOpen = $state(false);
 	const currentId = $derived(page.params.id ? Number(page.params.id) : null);
-	// ナビゲーションしたらドロワーを閉じる
+	const mode = $derived(topbarMode(page.url.pathname));
+	const showReading = $derived(mode === 'back');
+	// ナビゲーションしたら「…」ポップオーバーを閉じる
 	$effect(() => {
 		void page.url.pathname;
-		drawerOpen = false;
+		menuOpen = false;
 	});
 </script>
 
@@ -32,20 +38,31 @@
 
 <div class="shell">
 	<header class="topbar">
-		<button
-			class="menu"
-			aria-label="メニュー"
-			aria-expanded={drawerOpen}
-			onclick={() => (drawerOpen = !drawerOpen)}
-		>
-			<svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none">
-				<path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" />
-			</svg>
-		</button>
-		<a class="brand" href={resolve('/')}>moka-1</a>
+		{#if showReading}
+			<a class="back" href={resolve('/')}>← 戻る</a>
+		{:else}
+			<a class="brand" href={resolve('/')}>moka-1</a>
+			<div class="topbar-menu">
+				<button
+					class="menu-trigger"
+					type="button"
+					aria-haspopup="true"
+					aria-expanded={menuOpen}
+					aria-label="メニュー"
+					onclick={() => (menuOpen = !menuOpen)}
+				>
+					…
+				</button>
+				{#if menuOpen}
+					<div class="popover" role="menu">
+						<a role="menuitem" class="popover-item" href={resolve('/feeds')}>フィード管理</a>
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</header>
 
-	<aside class="sidebar" class:open={drawerOpen}>
+	<aside class="sidebar" class:sidebar-hidden={showReading}>
 		<div class="sidebar-head">
 			<a class="brand" href={resolve('/')}>moka-1</a>
 			<a class="feeds-link" href={resolve('/feeds')}>フィード管理</a>
@@ -62,7 +79,7 @@
 		{/if}
 	</aside>
 
-	<main class="reading">
+	<main class="reading" class:reading-visible={showReading}>
 		{@render children()}
 	</main>
 </div>
@@ -79,6 +96,7 @@
 	.topbar {
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 8px;
 		height: 52px;
 		padding: 0 12px;
@@ -88,7 +106,19 @@
 		top: 0;
 		z-index: 2;
 	}
-	.menu {
+	.back {
+		display: flex;
+		align-items: center;
+		height: 44px;
+		padding: 0 8px;
+		font: 500 14px/1 var(--font-ui);
+		color: var(--kon);
+		text-decoration: none;
+	}
+	.topbar-menu {
+		position: relative;
+	}
+	.menu-trigger {
 		display: grid;
 		place-items: center;
 		width: 44px;
@@ -96,7 +126,31 @@
 		border: none;
 		background: transparent;
 		color: var(--kon);
+		font: 500 18px/1 var(--font-ui);
 		cursor: pointer;
+	}
+	.popover {
+		position: absolute;
+		top: 48px;
+		right: 0;
+		min-width: 160px;
+		background: var(--geppaku);
+		border: 0.5px solid var(--hatoba);
+		border-radius: var(--radius-control);
+		overflow: hidden;
+		z-index: 4;
+	}
+	.popover-item {
+		display: flex;
+		min-height: 44px;
+		padding: 0 16px;
+		align-items: center;
+		font: 400 13px/1.8 var(--font-ui);
+		color: var(--kon);
+		text-decoration: none;
+	}
+	.popover-item:hover {
+		background: var(--hatoba);
 	}
 	.sidebar {
 		background: var(--geppaku);
@@ -131,23 +185,51 @@
 		padding: 24px 20px 32px;
 	}
 
-	/* モバイル(< 900px): ドロワー */
+	/* モバイル(< 900px): 記事リスト⇄読書ビューのマスター・ディテール式プッシュ遷移 */
 	@media (max-width: 899.98px) {
 		.sidebar {
 			position: fixed;
 			top: 52px;
 			bottom: 0;
 			left: 0;
-			width: min(var(--sidebar-w), 85vw);
-			transform: translateX(-100%);
-			transition: transform var(--dur-calm) var(--ease-calm);
-			z-index: 3;
-		}
-		.sidebar.open {
+			width: 100%;
 			transform: translateX(0);
+			visibility: visible;
+			transition:
+				transform var(--dur-calm) var(--ease-calm),
+				visibility 0s linear 0s;
+			z-index: 1;
 		}
-		.sidebar-head .brand {
+		.sidebar.sidebar-hidden {
+			transform: translateX(-100%);
+			visibility: hidden;
+			transition:
+				transform var(--dur-calm) var(--ease-calm),
+				visibility 0s linear var(--dur-calm);
+		}
+		.sidebar-head {
 			display: none;
+		}
+
+		.reading {
+			position: fixed;
+			top: 52px;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			overflow-y: auto;
+			transform: translateX(100%);
+			visibility: hidden;
+			transition:
+				transform var(--dur-calm) var(--ease-calm),
+				visibility 0s linear var(--dur-calm);
+		}
+		.reading.reading-visible {
+			transform: translateX(0);
+			visibility: visible;
+			transition:
+				transform var(--dur-calm) var(--ease-calm),
+				visibility 0s linear 0s;
 		}
 	}
 

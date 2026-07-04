@@ -39,7 +39,7 @@ services:
   # 公式イメージ(ghcr.io/kaikei-e/plecto)固定 — ADR00005 の Revisit Trigger(公式イメージ配布)
   # が発火したためソースビルドから移行。タグは可変なので digest も併記して pin する。
   plecto:
-    image: ghcr.io/kaikei-e/plecto:0.1.0@sha256:71252ce6061099d2e41681dae14e098183030caa109416d37787b6890e38bca6
+    image: ghcr.io/kaikei-e/plecto:0.1.1@sha256:cb7eb3f49ac9c2615109ecc13500bad607879132b21545eb426bf60303223632
     command: ["/run/plecto/manifest.toml"] # bind アドレスは manifest の [listen] 側(CLI引数は渡さない)
     restart: unless-stopped
     ports:

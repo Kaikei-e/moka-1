@@ -10,6 +10,20 @@ export default defineConfig({
 		baseURL: process.env.E2E_WEB_URL ?? 'http://localhost:3000',
 		trace: 'retain-on-failure'
 	},
+	// モバイル導線(記事リスト⇄読書ビューのプッシュ遷移)は 900px 未満のビューポートでのみ
+	// 意味を持つため専用プロジェクトに分離する。既存シナリオ(desktop)は従来どおりデフォルト
+	// ビューポートのまま
+	projects: [
+		{
+			name: 'desktop',
+			testIgnore: /03-mobile-navigation\.spec\.ts/
+		},
+		{
+			name: 'mobile',
+			testMatch: /03-mobile-navigation\.spec\.ts/,
+			use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
+		}
+	],
 	// CI では list に加えて html レポートを出す(失敗時に artifact として回収する)
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']]
 });
