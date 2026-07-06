@@ -84,6 +84,28 @@ async def _one_stream(http: httpx.AsyncClient, prompt: str, n_predict: int) -> d
     return result
 
 
+def _np_summary(
+    spec: ModelSpec, *, np: int, results: list[dict[str, Any]], wall_s: float
+) -> dict[str, Any]:
+    """同時ストリーム結果の集計。tg t/s はデコード時間のみで計算する.
+
+    壁時間は各ストリームの pp フェーズを含むため tg t/s を過少報告する。
+    同時デコードなので最長 predicted_ms をデコード窓の近似に使い、
+    pp込みの実効値は aggregate_e2e_tps として別掲する。
+    """
+    per_stream = [round(float(r["timings"]["predicted_per_second"]), 1) for r in results]
+    total_tokens = sum(int(r["timings"]["predicted_n"]) for r in results)
+    decode_s = max(float(r["timings"]["predicted_ms"]) for r in results) / 1000.0
+    return {
+        "model_key": spec.key,
+        "np": np,
+        "per_stream_tg_tps": per_stream,
+        "aggregate_tg_tps": round(total_tokens / decode_s, 1) if decode_s > 0 else 0.0,
+        "aggregate_e2e_tps": round(total_tokens / wall_s, 1),
+        "wall_s": round(wall_s, 1),
+    }
+
+
 def run_np_bench(
     base_url: str, spec: ModelSpec, *, np: int = 3, n_predict: int = 128
 ) -> dict[str, Any]:
@@ -100,14 +122,6 @@ def run_np_bench(
                 *(_one_stream(http, prompt, n_predict) for _ in range(np))
             )
             wall_s = time.monotonic() - started
-        per_stream = [round(float(r["timings"]["predicted_per_second"]), 1) for r in results]
-        total_tokens = sum(int(r["timings"]["predicted_n"]) for r in results)
-        return {
-            "model_key": spec.key,
-            "np": np,
-            "per_stream_tg_tps": per_stream,
-            "aggregate_tg_tps": round(total_tokens / wall_s, 1),
-            "wall_s": round(wall_s, 1),
-        }
+        return _np_summary(spec, np=np, results=results, wall_s=wall_s)
 
     return asyncio.run(_run())

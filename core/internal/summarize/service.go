@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 // attemptKind は enrichment_attempts.kind の値(db/schema.sql の CHECK 制約に合わせる)。
@@ -43,8 +44,8 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 		return Result{}, s.fail(ctx, articleID, err)
 	}
 
-	if len(text) > maxInputChars {
-		return Result{}, s.fail(ctx, articleID, fmt.Errorf("%d chars: %w", len(text), ErrArticleTooLong))
+	if est := estimateTokens(text); est > maxInputTokens {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("~%d tokens: %w", est, ErrArticleTooLong))
 	}
 
 	completion, err := s.complete.Complete(ctx, text)
@@ -66,12 +67,14 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 	}
 	meta["think_stripped"] = stripped
 
-	sum, err := s.store.InsertSummary(ctx, articleID, summaryText, meta)
+	persistCtx, cancel := persistContext(ctx)
+	defer cancel()
+	sum, err := s.store.InsertSummary(persistCtx, articleID, summaryText, meta)
 	if err != nil {
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("insert summary %d: %w", articleID, err))
 	}
 
-	if attemptErr := s.store.InsertEnrichmentAttempt(ctx, articleID, attemptKind, "succeeded", ""); attemptErr != nil {
+	if attemptErr := s.store.InsertEnrichmentAttempt(persistCtx, articleID, attemptKind, "succeeded", ""); attemptErr != nil {
 		s.log.Warn("record enrichment attempt", "article_id", articleID, "err", attemptErr.Error())
 	}
 	return Result{Summary: sum, Created: true}, nil
@@ -100,8 +103,8 @@ func (s *Service) SummarizeStream(
 		return Result{}, s.fail(ctx, articleID, err)
 	}
 
-	if len(text) > maxInputChars {
-		return Result{}, s.fail(ctx, articleID, fmt.Errorf("%d chars: %w", len(text), ErrArticleTooLong))
+	if est := estimateTokens(text); est > maxInputTokens {
+		return Result{}, s.fail(ctx, articleID, fmt.Errorf("~%d tokens: %w", est, ErrArticleTooLong))
 	}
 
 	var stripper thinkStreamStripper
@@ -131,12 +134,14 @@ func (s *Service) SummarizeStream(
 	}
 	meta["think_stripped"] = stripped
 
-	sum, err := s.store.InsertSummary(ctx, articleID, summaryText, meta)
+	persistCtx, cancel := persistContext(ctx)
+	defer cancel()
+	sum, err := s.store.InsertSummary(persistCtx, articleID, summaryText, meta)
 	if err != nil {
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("insert summary %d: %w", articleID, err))
 	}
 
-	if attemptErr := s.store.InsertEnrichmentAttempt(ctx, articleID, attemptKind, "succeeded", ""); attemptErr != nil {
+	if attemptErr := s.store.InsertEnrichmentAttempt(persistCtx, articleID, attemptKind, "succeeded", ""); attemptErr != nil {
 		s.log.Warn("record enrichment attempt", "article_id", articleID, "err", attemptErr.Error())
 	}
 	return Result{Summary: sum, Created: true}, nil
@@ -156,10 +161,23 @@ func (s *Service) resolveText(ctx context.Context, articleID int64, articleConte
 	return articleContent, nil
 }
 
+// persistTimeout は事後永続化(成果・試行イベントの書き込み)のデッドライン。
+const persistTimeout = 10 * time.Second
+
+// persistContext は生成完了後・失敗確定後の永続化に使う ctx を返す。リクエスト ctx の
+// キャンセルを引き継がない — 切断・タイムアウトはまさに failed を記録すべき事象であり、
+// キャンセル済み ctx のままでは insert 自体が即失敗して何も残らない(ADR00014 §7)。
+// 完成した要約が切断と同時に破棄されるのも防ぐ。無期限にしないよう独自の短いデッドラインを敷く。
+func persistContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), persistTimeout)
+}
+
 // fail は失敗を enrichment_attempts に追記してから、呼び出し元へ返すエラーをそのまま返す。
 // 記録自体の失敗はログに落として本来のエラーを握りつぶさない(fulltext の fail-soft 作法)。
 func (s *Service) fail(ctx context.Context, articleID int64, cause error) error {
-	if err := s.store.InsertEnrichmentAttempt(ctx, articleID, attemptKind, "failed", cause.Error()); err != nil {
+	persistCtx, cancel := persistContext(ctx)
+	defer cancel()
+	if err := s.store.InsertEnrichmentAttempt(persistCtx, articleID, attemptKind, "failed", cause.Error()); err != nil {
 		s.log.Warn("record enrichment attempt", "article_id", articleID, "err", err.Error())
 	}
 	return cause

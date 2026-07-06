@@ -24,10 +24,26 @@ var (
 	ErrEmptyCompletion = errors.New("empty completion after think-strip")
 )
 
-// maxInputChars はモデル呼び出し前のクライアント側ガード。実効コンテキスト 8192 トークンから
-// プロンプト・max_tokens 分を差し引いた保守的な文字数上限(日本語 1 文字≒1〜2 トークン想定)。
-// 正確なトークナイザは導入せず、超過は ErrArticleTooLong で明示エラーにする(黙ってトランケートしない)。
-const maxInputChars = 24000
+// maxInputTokens はモデル呼び出し前のクライアント側ガード。実効コンテキスト 8192 トークンから
+// システムプロンプト・max_tokens(1536)分を差し引いた入力予算。
+// 正確なトークナイザは導入せず、estimateTokens の保守的(過大)見積りと比較して、
+// 超過は ErrArticleTooLong で明示エラーにする(黙ってトランケートしない)。
+const maxInputTokens = 6000
+
+// estimateTokens は入力テキストのトークン数を保守的(実際より多め)に見積もる:
+// ASCII は 4 文字 ≒ 1 トークン、それ以外(日本語等のマルチバイト文字)は 1 文字 ≒ 2 トークン。
+// バイト数(len)で数えると日本語は文字数の3倍に膨れて単位が崩れるため、rune 単位で数える。
+func estimateTokens(text string) int {
+	ascii, other := 0, 0
+	for _, r := range text {
+		if r < 128 {
+			ascii++
+		} else {
+			other++
+		}
+	}
+	return ascii/4 + other*2
+}
 
 // Summary は要約の成果(article_summaries 行)。ModelMeta はモデル系譜(model/temperature/
 // top_p/top_k/enable_thinking/think_stripped)— ADR00007 の A/B 系譜追跡趣旨。
@@ -79,10 +95,13 @@ const (
 )
 
 // stripThink は Qwen 系モデルが(flag が効かなかった場合の防御として)応答冒頭に付ける
-// <think>...</think> CoT を機械的に剥がす。think タグが無ければそのまま返す。
-// 閉じずに truncate された場合は closed=false(呼び出し元は ErrEmptyCompletion を返すべき)。
+// <think>...</think> CoT を機械的に剥がす。think タグは応答冒頭(先頭空白は許容)のみを
+// 対象とする — 本文途中の "<think>" は引用等の本文とみなし、thinkStreamStripper の
+// ストリーミング判定とも一致させる(片方だけ途中一致だと、ストリームで見えた本文と
+// 保存される本文が食い違う)。閉じずに truncate された場合は closed=false
+// (呼び出し元は ErrEmptyCompletion を返すべき)。
 func stripThink(raw string) (text string, stripped bool, closed bool) {
-	_, rest, ok := strings.Cut(raw, openTag)
+	rest, ok := strings.CutPrefix(strings.TrimLeft(raw, thinkLeadingSpace), openTag)
 	if !ok {
 		return strings.TrimSpace(raw), false, true
 	}
@@ -94,6 +113,10 @@ func stripThink(raw string) (text string, stripped bool, closed bool) {
 
 	return strings.TrimSpace(after), true, true
 }
+
+// thinkLeadingSpace は think タグ検出時に無視する応答冒頭の空白類(Qwen は "\n<think>" の
+// ように改行を先行させることがある)。
+const thinkLeadingSpace = " \t\r\n"
 
 // thinkStreamStripState は thinkStreamStripper の内部フェーズ。
 type thinkStreamStripState int
@@ -132,15 +155,23 @@ func (s *thinkStreamStripper) feed(chunk string) string {
 	default: // thinkStreamUndecided
 		s.pending.WriteString(chunk)
 		buffered := s.pending.String()
-		if len(buffered) < len(openTag) {
-			return ""
-		}
-		if !strings.HasPrefix(buffered, openTag) {
+		// stripThink と同じ判定: 先頭空白は許容した上で、冒頭が <think> の時だけ think モード。
+		// 先頭空白をスキップしないと "\n<think>" で passthrough に落ち、CoT が丸ごと漏れる。
+		trimmed := strings.TrimLeft(buffered, thinkLeadingSpace)
+		if len(trimmed) < len(openTag) {
+			if strings.HasPrefix(openTag, trimmed) {
+				return "" // まだ <think> かどうか確定しない — 保留
+			}
 			s.pending.Reset()
 			s.state = thinkStreamPassthrough
 			return buffered
 		}
-		rest := buffered[len(openTag):]
+		if !strings.HasPrefix(trimmed, openTag) {
+			s.pending.Reset()
+			s.state = thinkStreamPassthrough
+			return buffered
+		}
+		rest := trimmed[len(openTag):]
 		s.pending.Reset()
 		s.state = thinkStreamInsideThink
 		_, after, ok := strings.Cut(rest, closeTag)

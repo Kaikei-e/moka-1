@@ -20,6 +20,7 @@ type fakeStore struct {
 	fetchRecords  []FetchRecord
 	insertedItems []Item
 	insertReturn  int
+	insertErr     error // InsertArticles を失敗させる(部分失敗の再現用)
 }
 
 func (s *fakeStore) FeedByURL(_ context.Context, url string) (Feed, bool, error) {
@@ -45,6 +46,9 @@ func (s *fakeStore) InsertFeedFetch(_ context.Context, _ int64, rec FetchRecord)
 }
 
 func (s *fakeStore) InsertArticles(_ context.Context, _ int64, items []Item) (int, error) {
+	if s.insertErr != nil {
+		return 0, s.insertErr
+	}
 	s.insertedItems = append(s.insertedItems, items...)
 	return s.insertReturn, nil
 }
@@ -166,7 +170,7 @@ func TestRegistrarRegister(t *testing.T) {
 		assert.Empty(t, store.insertedItems)
 	})
 
-	t.Run("invalid url short-circuits before store and fetcher", func(t *testing.T) {
+	t.Run("invalid url on unknown feed persists nothing and never fetches", func(t *testing.T) {
 		t.Parallel()
 
 		store := &fakeStore{}
@@ -179,4 +183,74 @@ func TestRegistrarRegister(t *testing.T) {
 		assert.Empty(t, store.insertedFeeds)
 		assert.Empty(t, store.fetchRecords)
 	})
+
+	t.Run("invalid url on existing feed records an error event (backoff instead of every-tick retry)", func(t *testing.T) {
+		t.Parallel()
+
+		// 登録後にドメインが解決不能/プライベート化したフィード: イベントを記録しないと
+		// due 判定が下がらず、スケジューラが毎 tick 再試行し続ける
+		store := &fakeStore{existing: &Feed{ID: 7, URL: "http://127.0.0.1/feed"}}
+		fetcher := &fakeFetcher{}
+		reg := NewRegistrar(store, fetcher, NewURLValidator(false), slog.New(slog.DiscardHandler))
+
+		_, err := reg.Register(t.Context(), "http://127.0.0.1/feed")
+		require.ErrorIs(t, err, ErrPrivateHost)
+		assert.Zero(t, fetcher.numCalls)
+
+		require.Len(t, store.fetchRecords, 1, "検証失敗もイベントとして追記する")
+		assert.NotEmpty(t, store.fetchRecords[0].Error)
+		assert.Empty(t, store.fetchRecords[0].ETag, "検証失敗イベントは検証子を持たない")
+	})
+
+	t.Run("article insert failure does not commit the new conditional-GET state", func(t *testing.T) {
+		t.Parallel()
+
+		// 検証子(ETag)を記事より先にコミットすると、記事挿入が失敗した瞬間に
+		// 以後 304 が返り続け、その回の記事を恒久に失う
+		store := &fakeStore{
+			existing:  &Feed{ID: 7, URL: "http://example.com/feed.xml"},
+			insertErr: assert.AnError,
+		}
+		fetcher := &fakeFetcher{result: okFetch}
+		_, err := newTestRegistrar(store, fetcher).Register(t.Context(), "http://example.com/feed.xml")
+		require.ErrorIs(t, err, assert.AnError)
+
+		require.Len(t, store.fetchRecords, 1, "失敗イベントは残す(バックオフ用)")
+		rec := store.fetchRecords[0]
+		assert.NotEmpty(t, rec.Error)
+		assert.Empty(t, rec.ETag, "新しい ETag を確定させない(次回取得で再処理させる)")
+		assert.Empty(t, rec.LastModified)
+	})
+
+	t.Run("success records the conditional-GET state only after articles are stored", func(t *testing.T) {
+		t.Parallel()
+
+		calls := &callOrderStore{fakeStore: fakeStore{
+			existing:     &Feed{ID: 7, URL: "http://example.com/feed.xml"},
+			insertReturn: 2,
+		}}
+		fetcher := &fakeFetcher{result: okFetch}
+		reg := NewRegistrar(calls, fetcher, NewURLValidator(true), slog.New(slog.DiscardHandler))
+		_, err := reg.Register(t.Context(), "http://example.com/feed.xml")
+		require.NoError(t, err)
+
+		require.Equal(t, []string{"InsertArticles", "InsertFeedFetch"}, calls.order,
+			"記事挿入 → 検証子コミット の順(逆だと部分失敗で記事を失う)")
+	})
+}
+
+// callOrderStore は書き込み系呼び出しの順序を記録する(C-1 の順序保証テスト用)。
+type callOrderStore struct {
+	fakeStore
+	order []string
+}
+
+func (s *callOrderStore) InsertArticles(ctx context.Context, feedID int64, items []Item) (int, error) {
+	s.order = append(s.order, "InsertArticles")
+	return s.fakeStore.InsertArticles(ctx, feedID, items)
+}
+
+func (s *callOrderStore) InsertFeedFetch(ctx context.Context, feedID int64, rec FetchRecord) error {
+	s.order = append(s.order, "InsertFeedFetch")
+	return s.fakeStore.InsertFeedFetch(ctx, feedID, rec)
 }

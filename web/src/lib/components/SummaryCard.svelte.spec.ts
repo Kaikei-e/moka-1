@@ -23,6 +23,29 @@ function sseResponse(status: number, events: SSEEvent[]) {
 	});
 }
 
+// イベントを1つずつ手で流し込める SSE レスポンス(記事切り替え中のストリーム検証用)
+function controlledSSEResponse(status: number) {
+	let controller!: ReadableStreamDefaultController<Uint8Array>;
+	const stream = new ReadableStream<Uint8Array>({
+		start(c) {
+			controller = c;
+		}
+	});
+	const encoder = new TextEncoder();
+	return {
+		response: new Response(stream, {
+			status,
+			headers: { 'Content-Type': 'text/event-stream' }
+		}),
+		push(e: SSEEvent) {
+			controller.enqueue(encoder.encode(sseText([e])));
+		},
+		close() {
+			controller.close();
+		}
+	};
+}
+
 function deferredSSEResponse(status: number, events: SSEEvent[]) {
 	let resolve!: () => void;
 	const gate = new Promise<void>((r) => (resolve = r));
@@ -162,6 +185,43 @@ describe('SummaryCard.svelte', () => {
 		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('記事7の要約');
 
 		await rerender({ articleId: 8 });
+
+		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
+		await expect.element(page.getByTestId('summary-text')).not.toBeInTheDocument();
+	});
+
+	it('stops applying an in-flight stream after the article id changes (stale deltas must not leak)', async () => {
+		const sse = controlledSSEResponse(200);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => Promise.resolve(sse.response))
+		);
+
+		const { rerender } = render(SummaryCard, { articleId: 7 });
+		await page.getByRole('button', { name: '要約する' }).click();
+
+		sse.push({ event: 'delta', data: { text: '記事7の要約' } });
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('記事7の要約');
+
+		await rerender({ articleId: 8 });
+		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
+
+		sse.push({ event: 'delta', data: { text: ' の続き' } });
+		sse.push({
+			event: 'done',
+			data: {
+				summary: {
+					article_id: 7,
+					text: '記事7の要約 の続き',
+					model_meta: {},
+					created_at: '2026-07-01T09:00:00Z'
+				},
+				created: true
+			}
+		});
+		sse.close();
+		// 取り残されたストリームの処理が済むのを待ってから副作用の不在を確かめる
+		await new Promise((r) => setTimeout(r, 20));
 
 		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
 		await expect.element(page.getByTestId('summary-text')).not.toBeInTheDocument();

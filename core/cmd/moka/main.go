@@ -69,6 +69,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	// スケジューラは専用の cancel を持つ: listen 失敗で return する経路でも必ず止めてから
+	// 抜ける(deferred pool.Close() がスケジューラのクエリ実行中に走らないように)。
+	schedCtx, stopScheduler := context.WithCancel(ctx)
+	defer stopScheduler()
+
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
 	wg.Go(func() {
@@ -78,11 +83,13 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		}
 	})
 	wg.Go(func() {
-		scheduler.Run(ctx)
+		scheduler.Run(schedCtx)
 	})
 
 	select {
 	case err := <-errCh:
+		stopScheduler()
+		wg.Wait()
 		return err
 	case <-ctx.Done():
 	}

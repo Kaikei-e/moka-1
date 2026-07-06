@@ -188,6 +188,15 @@ def cmd_generate(args: argparse.Namespace) -> int:
         max_tokens = 2048 if spec.thinking else 1024
     schema = generate.TagResult.model_json_schema() if task == "tags" else None
 
+    # 再開: 途中クラッシュ後の再実行で記録済み (task, item, seed) を二重記録しない
+    todo = generate.pending_items(items, seeds, task=task, done=generate.completed_units(run_id))
+    skipped = len(items) * len(seeds) - len(todo)
+    if skipped:
+        print(f"resume: {skipped}/{len(items) * len(seeds)} 件は記録済みのためスキップ")
+    if not todo:
+        print(f"run {run_id} already complete")
+        return 0
+
     with llama_server(spec) as handle:
         server_flags = [f"-hf {spec.hf}", "-ngl 99"]
         generate.write_run_meta(
@@ -208,31 +217,28 @@ def cmd_generate(args: argparse.Namespace) -> int:
         )
         with LlamaClient(handle.base_url) as client:
             client.chat("ウォームアップ。", sampling=spec.sampling, max_tokens=32)  # 捨てる
-            total = len(items) * len(seeds)
-            done = 0
-            for seed in seeds:
-                for item_id, prompt in items:
-                    record = generate.generate_one(
-                        client,
-                        spec,
-                        run_id=run_id,
-                        task=task,
-                        item_id=item_id,
-                        prompt=prompt,
-                        prompt_sha=prompt_sha,
-                        seed=seed,
-                        max_tokens=max_tokens,
-                        server_flags=server_flags,
-                        json_schema=schema,
-                        model_key=args.label,
-                    )
-                    generate.append_record(run_id, record)
-                    done += 1
-                    print(
-                        f"[{done}/{total}] {item_id} seed={seed} "
-                        f"{record.total_ms / 1000:.1f}s ans={record.answer_tokens}tok "
-                        f"cot={record.cot_tokens}tok eff={record.effective_answer_tps}t/s"
-                    )
+            total = len(todo)
+            for done, (seed, item_id, prompt) in enumerate(todo, start=1):
+                record = generate.generate_one(
+                    client,
+                    spec,
+                    run_id=run_id,
+                    task=task,
+                    item_id=item_id,
+                    prompt=prompt,
+                    prompt_sha=prompt_sha,
+                    seed=seed,
+                    max_tokens=max_tokens,
+                    server_flags=server_flags,
+                    json_schema=schema,
+                    model_key=args.label,
+                )
+                generate.append_record(run_id, record)
+                print(
+                    f"[{done}/{total}] {item_id} seed={seed} "
+                    f"{record.total_ms / 1000:.1f}s ans={record.answer_tokens}tok "
+                    f"cot={record.cot_tokens}tok eff={record.effective_answer_tps}t/s"
+                )
     print(f"run {run_id} complete")
     return 0
 
@@ -256,27 +262,32 @@ def cmd_judge(args: argparse.Namespace) -> int:
     lenses = args.lenses.split(",") if args.lenses else list(judge.LENSES)
     template, prompt_sha = judge.load_judge_prompt()
     sources = _sources_for_pairs(pairs)
+    # 再開: 途中クラッシュ後の再実行で記録済み (pair, lens) を二重投票させない
+    todo = judge.pending_units(pairs, lenses, judge.completed_units(args.name, judge_spec.key))
+    skipped = len(pairs) * len(lenses) - len(todo)
+    if skipped:
+        print(f"resume: {skipped}/{len(pairs) * len(lenses)} 件は記録済みのためスキップ")
+    if not todo:
+        print(f"verdicts already complete for judge={judge_spec.key}")
+        return 0
     with llama_server(judge_spec) as handle, LlamaClient(handle.base_url) as client:
         client.chat("ウォームアップ。", sampling=judge_spec.sampling, max_tokens=32)
-        total = len(pairs) * len(lenses)
-        done = 0
-        for pair in pairs:
-            for lens in lenses:
-                record = judge.judge_pair(
-                    client,
-                    judge_spec,
-                    pair,
-                    lens=lens,
-                    source=sources[pair.pair_id],
-                    template=template,
-                    prompt_sha=prompt_sha,
-                )
-                judge.append_verdict(args.name, judge_spec.key, record)
-                done += 1
-                print(
-                    f"[{done}/{total}] {pair.pair_id} {lens}: {record.verdict} "
-                    f"(orig={record.winner_orig}, swap={record.winner_swap})"
-                )
+        total = len(todo)
+        for done, (pair, lens) in enumerate(todo, start=1):
+            record = judge.judge_pair(
+                client,
+                judge_spec,
+                pair,
+                lens=lens,
+                source=sources[pair.pair_id],
+                template=template,
+                prompt_sha=prompt_sha,
+            )
+            judge.append_verdict(args.name, judge_spec.key, record)
+            print(
+                f"[{done}/{total}] {pair.pair_id} {lens}: {record.verdict} "
+                f"(orig={record.winner_orig}, swap={record.winner_swap})"
+            )
     print(f"verdicts written for judge={judge_spec.key}")
     return 0
 

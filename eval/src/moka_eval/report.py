@@ -52,11 +52,16 @@ def pair_level_winners(verdicts: list[VerdictRecord], key: PairKey) -> dict[str,
 
 
 def position_consistency(verdicts: list[VerdictRecord]) -> float:
-    """両順で同一実体を選べた割合(位置バイアスの逆指標)."""
-    if not verdicts:
+    """両順で同一実体を選べた割合(位置バイアスの逆指標)。parse_fail は分母からも除く."""
+    eligible = [v for v in verdicts if "parse_fail" not in (v.winner_orig, v.winner_swap)]
+    if not eligible:
         return 0.0
-    consistent = sum(1 for v in verdicts if v.verdict != "tie" or v.winner_orig == "tie")
-    return consistent / len(verdicts)
+    consistent = sum(
+        1
+        for v in eligible
+        if v.verdict != "tie" or (v.winner_orig == "tie" and v.winner_swap == "tie")
+    )
+    return consistent / len(eligible)
 
 
 def judge_agreement(

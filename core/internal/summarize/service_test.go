@@ -36,7 +36,11 @@ func (s *fakeStore) LatestSummary(_ context.Context, _ int64) (Summary, bool, er
 	return s.latest, s.latestFound, nil
 }
 
-func (s *fakeStore) InsertSummary(_ context.Context, articleID int64, text string, modelMeta map[string]any) (Summary, error) {
+func (s *fakeStore) InsertSummary(ctx context.Context, articleID int64, text string, modelMeta map[string]any) (Summary, error) {
+	// 実DB(pgx)と同じく、キャンセル済み ctx では書けない
+	if err := ctx.Err(); err != nil {
+		return Summary{}, err
+	}
 	if s.insertErr != nil {
 		return Summary{}, s.insertErr
 	}
@@ -45,7 +49,10 @@ func (s *fakeStore) InsertSummary(_ context.Context, articleID int64, text strin
 	return sum, nil
 }
 
-func (s *fakeStore) InsertEnrichmentAttempt(_ context.Context, articleID int64, kind, outcome, errMsg string) error {
+func (s *fakeStore) InsertEnrichmentAttempt(ctx context.Context, articleID int64, kind, outcome, errMsg string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.attempts = append(s.attempts, fakeAttempt{articleID, kind, outcome, errMsg})
 	return s.attemptErr
 }
@@ -110,7 +117,7 @@ func (c *fakeCompleter) CompleteStream(
 	return c.result, nil
 }
 
-func newTestService(store *fakeStore, ft *fakeFullTexts, comp *fakeCompleter) *Service {
+func newTestService(store *fakeStore, ft *fakeFullTexts, comp Completer) *Service {
 	return NewService(store, ft, comp, nil)
 }
 
@@ -180,7 +187,8 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{}
-		huge := strings.Repeat("あ", maxInputChars+1)
+		// 非ASCII 1 文字 ≒ 2 トークンの保守的見積りなので、予算の半分+1 文字で超過する
+		huge := strings.Repeat("あ", maxInputTokens/2+1)
 		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, huge)
 		require.ErrorIs(t, err, ErrArticleTooLong)
 		assert.Zero(t, comp.numCalls, "上限超過なら llm を叩かない")
@@ -244,6 +252,81 @@ func TestServiceSummarize(t *testing.T) {
 		require.Len(t, store.attempts, 1)
 		assert.Equal(t, fakeAttempt{7, "summary", "succeeded", ""}, store.attempts[0])
 		assert.Equal(t, false, res.Summary.ModelMeta["think_stripped"])
+	})
+}
+
+// cancelingCompleter は補完中にリクエスト ctx がキャンセルされた状況(クライアント切断・
+// タイムアウト)を再現する Completer。
+type cancelingCompleter struct {
+	cancel context.CancelFunc
+	result CompletionResult
+	err    error
+}
+
+func (c *cancelingCompleter) Complete(_ context.Context, _ string) (CompletionResult, error) {
+	c.cancel()
+	return c.result, c.err
+}
+
+func (c *cancelingCompleter) CompleteStream(
+	_ context.Context, _ string, onRawDelta func(string),
+) (CompletionResult, error) {
+	c.cancel()
+	if c.err == nil && c.result.Text != "" {
+		onRawDelta(c.result.Text)
+	}
+	return c.result, c.err
+}
+
+func TestServiceSummarizePersistsAfterDisconnect(t *testing.T) {
+	t.Parallel()
+
+	t.Run("failed attempt is recorded even when the request ctx is already canceled", func(t *testing.T) {
+		t.Parallel()
+
+		// 切断・タイムアウトはまさに failed を記録すべき事象 — キャンセル済み ctx を
+		// そのまま使うと insert 自体が失敗して何も残らない(ADR00014 §7 違反)
+		ctx, cancel := context.WithCancel(t.Context())
+		store := &fakeStore{}
+		comp := &cancelingCompleter{cancel: cancel, err: context.Canceled}
+		_, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content")
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+
+		require.Len(t, store.attempts, 1, "切断でも failed イベントを記録する")
+		assert.Equal(t, "failed", store.attempts[0].outcome)
+	})
+
+	t.Run("completed summary is saved even when the client disconnected at the end", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		store := &fakeStore{}
+		comp := &cancelingCompleter{
+			cancel: cancel,
+			result: CompletionResult{Text: "完成した要約", Meta: map[string]any{"model": "m"}},
+		}
+		res, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content")
+		require.NoError(t, err, "生成が完走したなら切断されていても保存する")
+
+		assert.True(t, res.Created)
+		require.Len(t, store.inserted, 1)
+		assert.Equal(t, "完成した要約", store.inserted[0].Text)
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "succeeded", store.attempts[0].outcome)
+	})
+
+	t.Run("stream: failed attempt is recorded after mid-stream disconnect", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		store := &fakeStore{}
+		comp := &cancelingCompleter{cancel: cancel, err: context.Canceled}
+		_, err := newTestService(store, &fakeFullTexts{}, comp).SummarizeStream(ctx, 7, "content", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "failed", store.attempts[0].outcome)
+		assert.Empty(t, store.inserted, "部分テキストは保存しない")
 	})
 }
 

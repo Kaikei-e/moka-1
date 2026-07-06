@@ -43,16 +43,21 @@ func NewRegistrar(store Store, fetch Fetcher, v *URLValidator, log *slog.Logger)
 
 // Register は URL を検証し、フィードを取得して保存する。
 // 既存フィードなら条件付き GET で再取得(304 は記事を触らない)。冪等。
-// 既存フィードの取得失敗は feed_fetches に error イベントを追記してからエラーを返す。
-// 新規フィードの取得失敗は何も永続化しない(孤児 feed 行を作らない)。
+// 既存フィードの取得失敗・検証失敗は feed_fetches に error イベントを追記してからエラーを返す
+// (記録が無いとスケジューラの due 判定が下がらず、壊れたフィードを毎 tick 再試行し続ける)。
+// 新規フィードの失敗は何も永続化しない(孤児 feed 行を作らない)。
 func (r *Registrar) Register(ctx context.Context, rawURL string) (RegisterResult, error) {
-	if err := r.validate.Validate(ctx, rawURL); err != nil {
-		return RegisterResult{}, fmt.Errorf("validate %s: %w", rawURL, err)
-	}
-
 	existing, found, err := r.store.FeedByURL(ctx, rawURL)
 	if err != nil {
 		return RegisterResult{}, fmt.Errorf("lookup feed %s: %w", rawURL, err)
+	}
+
+	if err := r.validate.Validate(ctx, rawURL); err != nil {
+		valErr := fmt.Errorf("validate %s: %w", rawURL, err)
+		if found {
+			r.recordFetchFailure(ctx, existing.ID, FetchRecord{Error: valErr.Error()})
+		}
+		return RegisterResult{}, valErr
 	}
 
 	var cond Conditional
@@ -68,16 +73,12 @@ func (r *Registrar) Register(ctx context.Context, rawURL string) (RegisterResult
 	res, fetchErr := r.fetch.Fetch(fetchCtx, rawURL, cond)
 	if fetchErr != nil {
 		if found {
-			rec := FetchRecord{
+			r.recordFetchFailure(ctx, existing.ID, FetchRecord{
 				StatusCode:   res.StatusCode,
 				ETag:         res.ETag,
 				LastModified: res.LastModified,
 				Error:        fetchErr.Error(),
-			}
-			// 失敗イベントの記録失敗はログに落として本来のエラーを返す(fail-soft)
-			if recErr := r.store.InsertFeedFetch(ctx, existing.ID, rec); recErr != nil {
-				r.log.Warn("record fetch failure", "feed_id", existing.ID, "err", recErr.Error())
-			}
+			})
 		}
 		return RegisterResult{}, fmt.Errorf("register %s: %w", rawURL, fetchErr)
 	}
@@ -92,19 +93,35 @@ func (r *Registrar) Register(ctx context.Context, rawURL string) (RegisterResult
 		created = true
 	}
 
+	// 記事を入れてから成功イベント(新しい検証子)を確定する。逆順だと、記事挿入が
+	// 失敗した瞬間に新 ETag だけが残り、以後 304 が返り続けてその回の記事を恒久に失う。
+	// 記事挿入後・イベント記録前に落ちても、次回は旧検証子で再取得し upsert が重複を吸収する。
+	inserted := 0
+	if !res.NotModified && len(res.Items) > 0 {
+		inserted, err = r.store.InsertArticles(ctx, f.ID, res.Items)
+		if err != nil {
+			// 検証子は付けずに失敗イベントだけ残す(次回取得で同じ内容を再処理させる)
+			r.recordFetchFailure(ctx, f.ID, FetchRecord{
+				StatusCode: res.StatusCode,
+				Error:      fmt.Sprintf("insert articles: %v", err),
+			})
+			return RegisterResult{}, fmt.Errorf("insert articles feed %d: %w", f.ID, err)
+		}
+	}
+
 	rec := FetchRecord{StatusCode: res.StatusCode, ETag: res.ETag, LastModified: res.LastModified}
 	if err := r.store.InsertFeedFetch(ctx, f.ID, rec); err != nil {
 		return RegisterResult{}, fmt.Errorf("record fetch feed %d: %w", f.ID, err)
 	}
 
-	inserted := 0
-	if !res.NotModified && len(res.Items) > 0 {
-		inserted, err = r.store.InsertArticles(ctx, f.ID, res.Items)
-		if err != nil {
-			return RegisterResult{}, fmt.Errorf("insert articles feed %d: %w", f.ID, err)
-		}
-	}
-
 	r.log.Info("feed registered", "feed_id", f.ID, "created", created, "inserted_articles", inserted)
 	return RegisterResult{Feed: f, Created: created, InsertedArticles: inserted}, nil
+}
+
+// recordFetchFailure は失敗イベントを追記する。記録自体の失敗はログに落として
+// 本来のエラーを握りつぶさない(fail-soft)。
+func (r *Registrar) recordFetchFailure(ctx context.Context, feedID int64, rec FetchRecord) {
+	if err := r.store.InsertFeedFetch(ctx, feedID, rec); err != nil {
+		r.log.Warn("record fetch failure", "feed_id", feedID, "err", err.Error())
+	}
 }

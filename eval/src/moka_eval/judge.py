@@ -6,7 +6,8 @@
 - 位置スワップ両順で同一実体が勝った時のみ勝ち、不一致・tie宣言は tie
   (inconsistency-as-a-tie: arXiv 2406.07791)
 - 判定は自由記述CoT→末尾 `[[A]]/[[B]]/[[tie]]` タグ抽出。json_schema で生成全体を
-  縛らない(推論10-15%劣化の報告)。パース失敗は1回リトライ、なお失敗なら tie
+  縛らない(推論10-15%劣化の報告)。パース失敗は max_tokens 倍増で1回リトライ、
+  なお失敗なら tie
 - 判定は greedy(temperature 0)。同一審判の温度サンプリング多数決は使わない
 - 「日本語の自然さ」レンズは使わない(人手相関0.48で飽和)。代わりに簡潔さ
 """
@@ -50,6 +51,17 @@ def extract_verdict(text: str) -> str | None:
     return "tie" if last == "tie" else last.upper()
 
 
+def _duplicate_ids(gens: Sequence[Mapping[str, str]]) -> set[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for g in gens:
+        article_id = g["article_id"]
+        if article_id in seen:
+            duplicates.add(article_id)
+        seen.add(article_id)
+    return duplicates
+
+
 def make_pairs(
     gen_a: Sequence[Mapping[str, str]],
     gen_b: Sequence[Mapping[str, str]],
@@ -57,7 +69,15 @@ def make_pairs(
     seed: int,
     task: str = "summarize",
 ) -> tuple[list[BlindPair], PairKey]:
-    """同一 article_id の出力をブラインド化ペアにする。左右はseed付きRNGで無作為化."""
+    """同一 article_id の出力をブラインド化ペアにする。左右はseed付きRNGで無作為化.
+
+    article_id が重複すると pair_id が衝突し key が上書きされ判定の帰属が壊れるため、
+    重複は ValueError にする。
+    """
+    duplicates = sorted(_duplicate_ids(gen_a) | _duplicate_ids(gen_b))
+    if duplicates:
+        msg = f"duplicate article_id(s) in generations: {', '.join(duplicates)}"
+        raise ValueError(msg)
     rng = random.Random(seed)
     by_article_b = {g["article_id"]: g for g in gen_b}
     pairs: list[BlindPair] = []
@@ -116,9 +136,17 @@ def _judge_once(
     *,
     max_tokens: int,
 ) -> str:
-    """1判定。タグ抽出失敗は1回リトライし、なお失敗なら 'parse_fail' を返す."""
-    for _ in range(2):
-        result = client.chat(prompt, sampling=GREEDY, seed=42, max_tokens=max_tokens)
+    """1判定。タグ抽出失敗は max_tokens を倍にして1回リトライ、なお失敗なら 'parse_fail'.
+
+    greedy + 固定 seed のため同一条件の再送は決定的に同じ出力になる。失敗の主因は
+    打ち切り(truncation)なので、リトライは max_tokens の倍増のみ行う(判定
+    プロトコル = greedy は維持)。CoT 途中打ち切り(finish_reason=length かつ
+    think後の回答が空)は未完 CoT 中の投機タグを拾わずパース失敗として扱う。
+    """
+    for attempt in range(2):
+        result = client.chat(prompt, sampling=GREEDY, seed=42, max_tokens=max_tokens * 2**attempt)
+        if result.finish_reason == "length" and not result.answer:
+            continue
         verdict = extract_verdict(result.answer) or extract_verdict(result.content)
         if verdict is not None:
             return verdict
@@ -194,6 +222,25 @@ def append_verdict(name: str, judge_key: str, record: VerdictRecord) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(record.model_dump_json() + "\n")
+
+
+def completed_units(name: str, judge_key: str) -> set[tuple[str, str]]:
+    """再開用: 記録済み (pair_id, lens) の集合。ファイル無しは空集合."""
+    path = verdicts_path(name, judge_key)
+    if not path.is_file():
+        return set()
+    with path.open(encoding="utf-8") as f:
+        return {
+            (r.pair_id, r.lens)
+            for r in (VerdictRecord.model_validate_json(line) for line in f if line.strip())
+        }
+
+
+def pending_units(
+    pairs: Sequence[BlindPair], lenses: Sequence[str], done: set[tuple[str, str]]
+) -> list[tuple[BlindPair, str]]:
+    """未実行の (pair, lens) を列挙する(再実行時の二重投票防止)."""
+    return [(p, lens) for p in pairs for lens in lenses if (p.pair_id, lens) not in done]
 
 
 def load_verdicts(name: str, judge_key: str) -> list[VerdictRecord]:

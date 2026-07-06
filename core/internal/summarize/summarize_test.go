@@ -38,6 +38,24 @@ func TestStripThink(t *testing.T) {
 			wantStrip:  true,
 			wantClosed: false,
 		},
+		{
+			// Qwen は "\n<think>" のように改行を先行させることがある — ストリーム側の
+			// 判定(thinkStreamStripper)と同じく先頭空白は許容する
+			name:       "leading whitespace before think tag is tolerated",
+			raw:        "\n <think>推論</think>要約本文",
+			wantText:   "要約本文",
+			wantStrip:  true,
+			wantClosed: true,
+		},
+		{
+			// 冒頭以外の <think> は本文(引用等)とみなす — ストリームで見えた本文と
+			// 保存本文が食い違わないための prefix 限定判定
+			name:       "mid-text think tag is kept as content",
+			raw:        "本文の前半<think>これも本文</think>後半",
+			wantText:   "本文の前半<think>これも本文</think>後半",
+			wantStrip:  false,
+			wantClosed: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -110,6 +128,32 @@ func TestThinkStreamStripper(t *testing.T) {
 
 		assert.Empty(t, got)
 		assert.False(t, closed)
+	})
+
+	t.Run("leading newline before think tag: CoT still never leaks", func(t *testing.T) {
+		t.Parallel()
+
+		// "\n<think>" で始まる応答(Qwen で頻出)。prefix 判定が先頭空白を許容しないと
+		// passthrough に落ちて推論過程が丸ごとクライアントへ漏れる
+		s := &thinkStreamStripper{}
+		got := feedAll(s, "\n<th", "ink>これは推論過程", "</think>", "本文の要約")
+		flush, closed := s.finish()
+		got += flush
+
+		assert.Equal(t, "本文の要約", got)
+		assert.True(t, closed)
+	})
+
+	t.Run("whitespace-only first chunk stays buffered until decidable", func(t *testing.T) {
+		t.Parallel()
+
+		s := &thinkStreamStripper{}
+		got := feedAll(s, "\n", " ", "<think>推論</think>要約")
+		flush, closed := s.finish()
+		got += flush
+
+		assert.Equal(t, "要約", got)
+		assert.True(t, closed)
 	})
 
 	t.Run("after passthrough begins, subsequent chunks stream immediately", func(t *testing.T) {

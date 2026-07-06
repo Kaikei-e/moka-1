@@ -33,6 +33,7 @@ func TestURLValidatorValidate(t *testing.T) {
 		"public.example.com":  {"93.184.216.34"},
 		"private.example.com": {"10.1.2.3"},
 		"mixed.example.com":   {"93.184.216.34", "192.168.0.7"},
+		"tailnet.example.com": {"100.100.1.2"},
 	}}
 
 	tests := []struct {
@@ -58,7 +59,15 @@ func TestURLValidatorValidate(t *testing.T) {
 		{name: "link-local literal is blocked", url: "http://169.254.1.1/feed", wantErr: ErrPrivateHost},
 		{name: "unspecified literal is blocked", url: "http://0.0.0.0/feed", wantErr: ErrPrivateHost},
 
+		{name: "cgnat 100.64/10 literal is blocked", url: "http://100.100.1.2/feed", wantErr: ErrPrivateHost},
+		{name: "ietf protocol 192.0.0/24 literal is blocked", url: "http://192.0.0.5/feed", wantErr: ErrPrivateHost},
+		{name: "benchmark 198.18/15 literal is blocked", url: "http://198.19.0.9/feed", wantErr: ErrPrivateHost},
+		{name: "multicast literal is blocked", url: "http://224.0.1.1/feed", wantErr: ErrPrivateHost},
+		{name: "broadcast literal is blocked", url: "http://255.255.255.255/feed", wantErr: ErrPrivateHost},
+		{name: "ipv4-mapped ipv6 cgnat literal is blocked", url: "http://[::ffff:100.64.0.1]/feed", wantErr: ErrPrivateHost},
+
 		{name: "hostname resolving to private ip is blocked", url: "http://private.example.com/feed", wantErr: ErrPrivateHost},
+		{name: "hostname resolving to cgnat ip is blocked", url: "http://tailnet.example.com/feed", wantErr: ErrPrivateHost},
 		{name: "hostname with any private ip is blocked", url: "http://mixed.example.com/feed", wantErr: ErrPrivateHost},
 
 		{name: "allow-private lets loopback through", url: "http://127.0.0.1/feed", allowPrivate: true},

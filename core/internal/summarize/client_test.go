@@ -180,6 +180,26 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 	})
 
+	t.Run("stream ending without [DONE] is wrapped as ErrLLMUnavailable (truncation guard)", func(t *testing.T) {
+		t.Parallel()
+
+		// llama.cpp がエラー中断してレスポンスを正常クローズした場合の再現:
+		// チャンクは届いたが終端マーカー [DONE] が無い。部分テキストを完全な要約として
+		// 返してはいけない(冪等保存され再生成されないため)。
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			flusher := w.(http.Flusher)
+			_, _ = w.Write([]byte(`data: {"model":"m","choices":[{"delta":{"content":"途中まで"}}]}` + "\n\n"))
+			_, _ = w.Write([]byte(`data: {"error":{"message":"slot released"}}` + "\n\n"))
+			flusher.Flush()
+		}))
+		defer srv.Close()
+
+		c := NewHTTPCompleter(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+	})
+
 	t.Run("stream with no chunks at all is wrapped as ErrLLMUnavailable", func(t *testing.T) {
 		t.Parallel()
 
