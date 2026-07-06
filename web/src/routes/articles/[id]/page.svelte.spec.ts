@@ -170,6 +170,42 @@ describe('articles/[id] reading view — 全文取り寄せ', () => {
 		await expect.element(page.getByRole('button', { name: '全文を取り寄せる' })).toBeVisible();
 	});
 
+	it('ignores an in-flight fulltext response that resolves after navigating to a different article', async () => {
+		const { promise, resolve } = deferredResponse(201, {
+			fulltext: {
+				article_id: 7,
+				text: '<p>記事7の取り寄せ全文。</p>',
+				fetched_at: '2026-07-01T10:00:00Z'
+			}
+		});
+		vi.stubGlobal('fetch', routeFetch({ fulltext: () => promise }));
+
+		const { rerender } = await render(Page, { data: pageData });
+		await page.getByRole('button', { name: '全文を取り寄せる' }).click();
+		await expect.element(page.getByTestId('fulltext-drip')).toBeVisible();
+
+		await rerender({ data: otherPageData });
+		resolve();
+		await promise;
+		// 遅延した応答の処理(json 解析 → 状態反映)が済むのを待ってから副作用の不在を確かめる
+		await new Promise((r) => setTimeout(r, 20));
+
+		await expect.element(page.getByText('記事7の取り寄せ全文。')).not.toBeInTheDocument();
+		await expect.element(page.getByText('別記事の概要です。')).toBeVisible();
+		await expect.element(page.getByRole('button', { name: '全文を取り寄せる' })).toBeVisible();
+		await expect.element(page.getByTestId('fulltext-drip')).not.toBeInTheDocument();
+	});
+
+	it('does not render the original link when the article URL is not http(s)', async () => {
+		vi.stubGlobal('fetch', routeFetch());
+		render(Page, {
+			data: { ...pageData, article: { ...article, url: 'javascript:alert(1)' } }
+		});
+
+		await expect.element(page.getByRole('heading', { name: 'Seven' })).toBeVisible();
+		expect(page.getByRole('link', { name: '原文を開く' }).elements()).toHaveLength(0);
+	});
+
 	it('renders the fetched full text as real structure — heading, list and code block', async () => {
 		const { promise, resolve } = deferredResponse(201, {
 			fulltext: {

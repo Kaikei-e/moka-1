@@ -222,4 +222,47 @@ describe('ArticleList.svelte — infinite scroll', () => {
 		await expect.element(page.getByRole('link', { name: /Fresh SSR article/ })).toBeVisible();
 		await expect.element(page.getByTestId('article-list-sentinel')).toBeInTheDocument();
 	});
+
+	it('drops an in-flight page when the props reset while it loads (stale page must not append)', async () => {
+		let resolveFetch!: (res: Response) => void;
+		const pending = new Promise<Response>((r) => (resolveFetch = r));
+		const fetchMock = vi
+			.fn<(input: string) => Promise<Response>>()
+			.mockImplementationOnce(() => pending)
+			.mockImplementation(() =>
+				Promise.resolve(jsonResponse(200, { articles: [], next_cursor: null }))
+			);
+		vi.stubGlobal('fetch', fetchMock);
+		vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+
+		const { rerender } = render(ArticleList, {
+			articles,
+			nextCursor: 'cursor-1',
+			currentId: null
+		});
+		latestObserver().trigger();
+		await expect.element(page.getByText(LOADING_MORE)).toBeVisible();
+
+		// 読み込み中に SSR props がリセットされる(例: 新規フィード登録後の再読み込み)
+		const refreshedArticles = [nextArticle(9, 'Fresh SSR article')];
+		await rerender({ articles: refreshedArticles, nextCursor: 'cursor-2', currentId: null });
+
+		resolveFetch(
+			jsonResponse(200, {
+				articles: [nextArticle(3, 'Stale page article')],
+				next_cursor: 'cursor-stale'
+			})
+		);
+		// 取り残された応答の処理が済むのを待ってから副作用の不在を確かめる
+		await new Promise((r) => setTimeout(r, 20));
+
+		expect(page.getByRole('link', { name: /Stale page article/ }).elements()).toHaveLength(0);
+		await expect.element(page.getByRole('link', { name: /Fresh SSR article/ })).toBeVisible();
+
+		// cursor も古い応答で上書きされない — 次の読み込みは新しい cursor から始まる
+		latestObserver().trigger();
+		await expect.element(page.getByText(LOADING_MORE)).not.toBeInTheDocument();
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining('cursor=cursor-2'));
+	});
 });

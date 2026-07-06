@@ -15,6 +15,7 @@
 	import SummaryCard from '$lib/components/SummaryCard.svelte';
 	import { toParagraphs } from '$lib/article-text';
 	import { sanitizeArticleHtml } from '$lib/sanitize';
+	import { isSafeExternalUrl } from '$lib/url';
 	import { formatDate } from '$lib/format';
 	import { UNTRANSLATED, FETCH_FULLTEXT, FETCHING_FULLTEXT } from '$lib/copy';
 
@@ -41,20 +42,24 @@
 	const fullTextHtml = $derived(fullText ? sanitizeArticleHtml(fullText) : null);
 
 	async function fetchFullText() {
+		// 応答待ちの間に記事が切り替わったら(コンポーネントは再利用される)応答を丸ごと捨てる
+		const id = data.article.id;
 		fetching = true;
 		fetchError = null;
 		try {
-			const res = await fetch(`/articles/${data.article.id}/fulltext`, { method: 'POST' });
+			const res = await fetch(`/articles/${id}/fulltext`, { method: 'POST' });
 			const body = await res.json();
+			if (id !== data.article.id) return;
 			if (!res.ok) {
 				fetchError = body.error ?? '取り寄せに失敗しました。再試行してください';
 				return;
 			}
 			fullText = body.fulltext.text;
 		} catch {
+			if (id !== data.article.id) return;
 			fetchError = '取り寄せに失敗しました。再試行してください';
 		} finally {
-			fetching = false;
+			if (id === data.article.id) fetching = false;
 		}
 	}
 </script>
@@ -71,7 +76,9 @@
 				{#if data.article.published_at}
 					<time datetime={data.article.published_at}>{formatDate(data.article.published_at)}</time>
 				{/if}
-				<a href={data.article.url} target="_blank" rel="noopener noreferrer">原文を開く</a>
+				{#if isSafeExternalUrl(data.article.url)}
+					<a href={data.article.url} target="_blank" rel="noopener noreferrer">原文を開く</a>
+				{/if}
 			</p>
 			<div class="article-actions">
 				{#if fullText === null && !fetching}
@@ -119,7 +126,7 @@
 	{/if}
 
 	<footer class="ask-dock">
-		<AskBar />
+		<AskBar articleId={data.article.id} />
 	</footer>
 </article>
 

@@ -13,15 +13,24 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { resolve } from '$app/paths';
+	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import ArticleList from '$lib/components/ArticleList.svelte';
 	import FeedRegisterForm from '$lib/components/FeedRegisterForm.svelte';
 	import { LIST_UNAVAILABLE } from '$lib/copy';
-	import { topbarMode } from '$lib/mobile-nav';
+	import { shouldResetReadingScroll, topbarMode } from '$lib/mobile-nav';
 
 	let { data, children } = $props();
 
 	let menuOpen = $state(false);
+	let readingEl = $state<HTMLElement | null>(null);
+	// SvelteKit がリセットするのは window のスクロールのみ。モバイルでは .reading 自体が
+	// スクロールコンテナなので、別パスへの遷移時に自前で先頭へ戻す(デスクトップでは no-op)
+	afterNavigate((nav) => {
+		if (shouldResetReadingScroll(nav.from?.url.pathname ?? null, nav.to?.url.pathname ?? null)) {
+			readingEl?.scrollTo(0, 0);
+		}
+	});
 	const currentId = $derived(page.params.id ? Number(page.params.id) : null);
 	const mode = $derived(topbarMode(page.url.pathname));
 	const showReading = $derived(mode === 'back');
@@ -79,7 +88,7 @@
 		{/if}
 	</aside>
 
-	<main class="reading" class:reading-visible={showReading}>
+	<main class="reading" class:reading-visible={showReading} bind:this={readingEl}>
 		{@render children()}
 	</main>
 </div>

@@ -48,13 +48,17 @@
 	}
 
 	async function summarize() {
+		// ストリーム中に記事が切り替わったら(コンポーネントは再利用される)残りは捨てて読むのをやめる
+		const id = articleId;
 		loading = true;
 		error = null;
 		text = null;
 		try {
-			const res = await fetch(`/articles/${articleId}/summary/stream`, { method: 'POST' });
+			const res = await fetch(`/articles/${id}/summary/stream`, { method: 'POST' });
+			if (id !== articleId) return;
 			if (!res.ok || !res.body) {
 				const body = await res.json().catch(() => ({}));
+				if (id !== articleId) return;
 				error = body.error ?? '要約に失敗しました。再試行してください';
 				return;
 			}
@@ -64,6 +68,10 @@
 			let buffer = '';
 			for (;;) {
 				const { done, value } = await reader.read();
+				if (id !== articleId) {
+					void reader.cancel();
+					return;
+				}
 				if (done) break;
 				buffer += decoder.decode(value, { stream: true });
 				let sep = buffer.indexOf('\n\n');
@@ -74,10 +82,11 @@
 				}
 			}
 		} catch {
+			if (id !== articleId) return;
 			error = '要約に失敗しました。再試行してください';
 			text = null;
 		} finally {
-			loading = false;
+			if (id === articleId) loading = false;
 		}
 	}
 </script>

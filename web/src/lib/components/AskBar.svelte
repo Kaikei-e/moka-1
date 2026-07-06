@@ -1,11 +1,23 @@
 <script lang="ts">
 	// Q&A(DESIGN_LANGUAGE §8.2)。回答はチャット吹き出しでなく fujinezu 面のフラットなブロック。
-	// llm 連携までは質問を積み、正直に「準備ができていない」ドリップを返す
+	// llm 連携までは質問を積み、正直に「準備ができていない」ドリップを返す。
+	//
+	// SvelteKit は同一ルート内の遷移でこのコンポーネントインスタンスを再利用するため、
+	// articleId の変化を検知して質問スタックと下書きをリセットする(SummaryCard と同じ作法)
 	import DripIndicator from './DripIndicator.svelte';
 	import { ANSWER_PENDING } from '$lib/copy';
 
+	let { articleId }: { articleId: number } = $props();
+
 	let draft = $state('');
 	let questions = $state<string[]>([]);
+
+	$effect(() => {
+		const id = articleId; // 依存の確立(記事切り替えのたびにリセットする)
+		void id;
+		draft = '';
+		questions = [];
+	});
 
 	function ask(e: SubmitEvent) {
 		e.preventDefault();

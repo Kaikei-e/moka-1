@@ -23,27 +23,35 @@
 	let loading = $state(false);
 	let failed = $state(false);
 	let sentinel = $state<HTMLElement | null>(null);
+	// props リセットのたびに進む世代番号。飛行中の loadMore が古い世代なら結果を丸ごと捨てる
+	// (リアクティブに描画へは使わないので素の変数でよい)
+	let generation = 0;
 
 	$effect(() => {
 		items = articles;
 		cursor = nextCursor;
 		failed = false;
+		loading = false;
+		generation += 1;
 	});
 
 	async function loadMore() {
 		if (loading || cursor === null) return;
+		const gen = generation;
 		loading = true;
 		failed = false;
 		try {
 			const res = await fetch(`/articles?cursor=${encodeURIComponent(cursor)}`);
 			if (!res.ok) throw new Error(`load more articles: ${res.status}`);
 			const body = await res.json();
+			if (gen !== generation) return;
 			items = [...items, ...body.articles];
 			cursor = body.next_cursor;
 		} catch {
+			if (gen !== generation) return;
 			failed = true;
 		} finally {
-			loading = false;
+			if (gen === generation) loading = false;
 		}
 	}
 
