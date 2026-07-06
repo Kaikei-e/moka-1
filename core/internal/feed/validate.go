@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 )
 
@@ -66,10 +67,33 @@ func (v *URLValidator) Validate(ctx context.Context, raw string) error {
 	return nil
 }
 
+// blockedPrefixes は net.IP の標準判定(IsPrivate 等)が拾わない非公開・特殊レンジ。
+// 特に 100.64.0.0/10(CGNAT)は Tailscale が使う — ホームラボ運用では tailnet 内
+// ホストへの SSRF 経路になるため必ず遮断する。
+var blockedPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("100.64.0.0/10"), // CGNAT(RFC 6598、Tailscale 等)
+	netip.MustParsePrefix("192.0.0.0/24"),  // IETF Protocol Assignments(RFC 6890)
+	netip.MustParsePrefix("198.18.0.0/15"), // ベンチマーク(RFC 2544)
+	netip.MustParsePrefix("240.0.0.0/4"),   // 予約(255.255.255.255 のブロードキャスト含む)
+}
+
 func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() ||
+	if ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified()
+		ip.IsMulticast() || // リンクローカルに限らず multicast 全域(224.0.0.0/4、ff00::/8)
+		ip.IsUnspecified() {
+		return true
+	}
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return true // IP として解釈できないものは安全側に倒す
+	}
+	addr = addr.Unmap() // IPv4-mapped IPv6 も IPv4 のレンジ判定に乗せる
+	for _, p := range blockedPrefixes {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }

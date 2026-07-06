@@ -179,6 +179,7 @@ func (c *HTTPCompleter) CompleteStream(
 	var full bytes.Buffer
 	var model string
 	sawChunk := false
+	sawDone := false
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -189,6 +190,7 @@ func (c *HTTPCompleter) CompleteStream(
 			continue
 		}
 		if data == "[DONE]" {
+			sawDone = true
 			break
 		}
 
@@ -215,6 +217,12 @@ func (c *HTTPCompleter) CompleteStream(
 	}
 	if !sawChunk {
 		return CompletionResult{}, fmt.Errorf("no chunks in stream: %w", ErrLLMUnavailable)
+	}
+	// [DONE] を見ずに正常終了したストリームは途中終端(llama.cpp のエラー中断等)とみなす。
+	// ここで弾かないと、切り詰められた部分テキストが完全な要約として永久保存される
+	// (要約は冪等 = 一度保存したら再生成しない)。
+	if !sawDone {
+		return CompletionResult{}, fmt.Errorf("stream ended without [DONE]: %w", ErrLLMUnavailable)
 	}
 
 	return CompletionResult{

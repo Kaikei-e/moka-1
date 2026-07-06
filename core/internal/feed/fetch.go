@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"time"
 
 	"github.com/mmcdole/gofeed"
@@ -97,10 +98,7 @@ func normalizeItems(items []*gofeed.Item) []Item {
 		if guid == "" {
 			continue
 		}
-		url := it.Link
-		if url == "" {
-			url = guid
-		}
+		url := safeItemURL(it.Link, guid)
 		content := it.Content
 		if content == "" {
 			content = it.Description
@@ -114,4 +112,18 @@ func normalizeItems(items []*gofeed.Item) []Item {
 		})
 	}
 	return out
+}
+
+// safeItemURL は記事リンクとして安全な絶対 http(s) URL を候補順に選ぶ。
+// フィードは外部入力 — <link>javascript:...</link> をそのまま保存すると
+// UI の「原文を開く」href に格納型のスクリプト URL が届く。該当なしは空文字
+// (リンク無し記事として扱う)。
+func safeItemURL(candidates ...string) string {
+	for _, c := range candidates {
+		u, err := neturl.Parse(c)
+		if err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" {
+			return c
+		}
+	}
+	return ""
 }

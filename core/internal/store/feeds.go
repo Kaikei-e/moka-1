@@ -55,13 +55,16 @@ func (s *Store) InsertFeed(ctx context.Context, url, title string) (feed.Feed, e
 	return f, nil
 }
 
-// LatestFetchConditional は最新 feed_fetches 行から条件付き GET の状態を導出する。
-// 取得履歴が無ければゼロ値(条件無し取得)。
+// LatestFetchConditional は検証子(etag / last_modified)を持つ最新の feed_fetches 行から
+// 条件付き GET の状態を導出する。単純な最新1行だと、検証子を返さない 304 や失敗イベントが
+// 1つ挟まるだけで有効な検証子を失い、以後フル再取得(または全量200と304の交互)に退化する。
+// 検証子付きの履歴が無ければゼロ値(条件無し取得)。
 func (s *Store) LatestFetchConditional(ctx context.Context, feedID int64) (feed.Conditional, error) {
 	var c feed.Conditional
 	err := s.pool.QueryRow(ctx,
 		`SELECT COALESCE(etag, ''), COALESCE(last_modified, '')
-		 FROM feed_fetches WHERE feed_id = $1
+		 FROM feed_fetches
+		 WHERE feed_id = $1 AND (etag IS NOT NULL OR last_modified IS NOT NULL)
 		 ORDER BY fetched_at DESC LIMIT 1`,
 		feedID,
 	).Scan(&c.ETag, &c.LastModified)

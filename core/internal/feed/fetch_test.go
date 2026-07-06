@@ -77,6 +77,45 @@ func TestHTTPFetcherFetch(t *testing.T) {
 		assert.Nil(t, fallback.PublishedAt)
 	})
 
+	t.Run("unsafe item link schemes are dropped (stored XSS guard)", func(t *testing.T) {
+		t.Parallel()
+
+		const evilRSS = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Evil Feed</title>
+    <item>
+      <title>javascript link</title>
+      <link>javascript:alert(1)</link>
+      <guid isPermaLink="false">guid-js</guid>
+    </item>
+    <item>
+      <title>data link with http guid</title>
+      <link>data:text/html,x</link>
+      <guid>http://example.com/real</guid>
+    </item>
+    <item>
+      <title>relative link</title>
+      <link>/relative/path</link>
+      <guid isPermaLink="false">guid-rel</guid>
+    </item>
+  </channel>
+</rss>`
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(evilRSS))
+		}))
+		t.Cleanup(srv.Close)
+
+		res, err := permissiveFetcher().Fetch(t.Context(), srv.URL, Conditional{})
+		require.NoError(t, err)
+		require.Len(t, res.Items, 3)
+
+		assert.Empty(t, res.Items[0].URL, "javascript: リンクは URL として保存しない")
+		assert.Equal(t, "guid-js", res.Items[0].GUID, "識別子としての guid は保持する")
+		assert.Equal(t, "http://example.com/real", res.Items[1].URL, "guid が安全な URL ならフォールバック")
+		assert.Empty(t, res.Items[2].URL, "相対パスは絶対 http(s) でないので落とす")
+	})
+
 	t.Run("sends conditional headers and honors 304", func(t *testing.T) {
 		t.Parallel()
 

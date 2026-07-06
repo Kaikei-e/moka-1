@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/Kaikei-e/moka-1/core/internal/summarize"
 )
@@ -41,6 +43,8 @@ func handleSummarizeArticle(articles ArticleGetter, summarizer ArticleSummarizer
 			writeError(w, http.StatusNotFound, "article not found")
 			return
 		}
+
+		clearWriteDeadline(w)
 
 		res, err := summarizer.Summarize(r.Context(), id, a.Content)
 		if err != nil {
@@ -88,6 +92,8 @@ func handleSummarizeArticleStream(articles ArticleGetter, summarizer ArticleSumm
 			return
 		}
 
+		clearWriteDeadline(w)
+
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -111,6 +117,16 @@ func handleSummarizeArticleStream(articles ArticleGetter, summarizer ArticleSumm
 		}
 
 		writeEvent("done", map[string]any{"summary": res.Summary, "created": res.Created})
+	}
+}
+
+// clearWriteDeadline は要約系ハンドラの書き込みデッドラインを解除する。サーバー全体の
+// WriteTimeout(60秒)は LLM の completeTimeout(60秒)と同値のため、生成が上限に近づくと
+// done/error イベントを送る前に接続が強制切断される — LLM を待つルートだけ上限を外し、
+// 応答の長さは completeTimeout 側で抑える。失敗してもストリーミング自体は試みる(fail-soft)。
+func clearWriteDeadline(w http.ResponseWriter) {
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {
+		slog.Warn("clear write deadline", "err", err.Error())
 	}
 }
 
