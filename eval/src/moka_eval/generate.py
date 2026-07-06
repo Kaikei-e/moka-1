@@ -145,6 +145,34 @@ def write_run_meta(run_id: str, meta: dict[str, Any]) -> None:
     )
 
 
+def completed_units(run_id: str) -> set[tuple[str, str, int]]:
+    """再開用: 記録済み (task, article_id, seed) の集合。ファイル無しは空集合."""
+    path = run_dir(run_id) / "generations.jsonl"
+    if not path.is_file():
+        return set()
+    with path.open(encoding="utf-8") as f:
+        return {
+            (r.task, r.article_id, r.seed)
+            for r in (GenerationRecord.model_validate_json(line) for line in f if line.strip())
+        }
+
+
+def pending_items(
+    items: Sequence[tuple[str, str]],
+    seeds: Sequence[int],
+    *,
+    task: str,
+    done: set[tuple[str, str, int]],
+) -> list[tuple[int, str, str]]:
+    """未実行の (seed, item_id, prompt) を列挙する(再実行時の二重記録防止)."""
+    return [
+        (seed, item_id, prompt)
+        for seed in seeds
+        for item_id, prompt in items
+        if (task, item_id, seed) not in done
+    ]
+
+
 def load_generations(run_id: str) -> list[GenerationRecord]:
     path = run_dir(run_id) / "generations.jsonl"
     if not path.is_file():
