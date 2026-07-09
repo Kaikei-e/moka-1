@@ -28,3 +28,7 @@ e2e/hurl/reports/
 # E2E スケジューラ検証: scheduler_e2e.sh が v1/v2 からコピー・差し替えて配信する実体
 # (コミットするのは feed-scheduler-v1.xml / feed-scheduler-v2.xml 側)
 e2e/fixtures/feed-scheduler.xml
+
+# E2E 非304再取得検証: dedupe_no_304_e2e.sh が v1/v2 からコピー・差し替えて配信する実体
+# (コミットするのは feed-dedupe-v1.xml / feed-dedupe-v2.xml 側)
+e2e/fixtures/feed-dedupe.xml

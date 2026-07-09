@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(条件付きGETが効かない再取得の検証用、v2)。
+     v1 の2件はそのまま、本当に新しい3件目を追加した内容。dedupe_no_304_e2e.sh が
+     「無駄な再取得の後でも新規記事のIDが連番のまま(欠番が増えていない)」ことの確認に使う。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Dedupe Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying that a non-304 re-fetch of already-known items wastes no id</description>
+    <item>
+      <title>Dedupe article 1</title>
+      <link>http://e2e-fixtures/articles/dedupe-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-dedupe:1</guid>
+      <pubDate>Mon, 01 Jul 2030 09:00:00 GMT</pubDate>
+      <description>Body of the first dedupe fixture article.</description>
+    </item>
+    <item>
+      <title>Dedupe article 2</title>
+      <link>http://e2e-fixtures/articles/dedupe-2</link>
+      <guid isPermaLink="false">urn:moka-e2e-dedupe:2</guid>
+      <pubDate>Tue, 02 Jul 2030 09:00:00 GMT</pubDate>
+      <description>Body of the second dedupe fixture article.</description>
+    </item>
+    <item>
+      <title>Dedupe article 3 (genuinely new)</title>
+      <link>http://e2e-fixtures/articles/dedupe-3</link>
+      <guid isPermaLink="false">urn:moka-e2e-dedupe:3</guid>
+      <pubDate>Wed, 03 Jul 2030 09:00:00 GMT</pubDate>
+      <description>Body of the third dedupe fixture article, only present from v2 onward.</description>
+    </item>
+  </channel>
+</rss>

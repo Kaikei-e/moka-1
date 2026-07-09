@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(条件付きGETが効かない再取得の検証用、v1)。
+     dedupe_no_304_e2e.sh がこの内容を feed-dedupe.xml としてコピーして配信し、
+     内容を変えずに touch(mtime だけ更新)して条件付きGETを迂回した再取得を再現する。
+     pubDate は他の全フィクスチャより新しい(2030年)ので一覧の先頭に来ることが保証される。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Dedupe Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying that a non-304 re-fetch of already-known items wastes no id</description>
+    <item>
+      <title>Dedupe article 1</title>
+      <link>http://e2e-fixtures/articles/dedupe-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-dedupe:1</guid>
+      <pubDate>Mon, 01 Jul 2030 09:00:00 GMT</pubDate>
+      <description>Body of the first dedupe fixture article.</description>
+    </item>
+    <item>
+      <title>Dedupe article 2</title>
+      <link>http://e2e-fixtures/articles/dedupe-2</link>
+      <guid isPermaLink="false">urn:moka-e2e-dedupe:2</guid>
+      <pubDate>Tue, 02 Jul 2030 09:00:00 GMT</pubDate>
+      <description>Body of the second dedupe fixture article.</description>
+    </item>
+  </channel>
+</rss>

@@ -41,7 +41,11 @@ hurl --test --jobs 1 \
   --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
   e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
 
-# 4. 常駐スケジューラ(バックグラウンド自律取得)の検証は独自フィードを登録するので、
+# 4. 条件付きGETが効かない(=毎回200で同じ内容を返す)フィードの再取得でも articles.id の
+# 欠番が増えないことの検証。独自フィードを登録するので、上記の厳密なカウントアサーションの後に走らせる
+bash e2e/hurl/core/dedupe_no_304_e2e.sh
+
+# 5. 常駐スケジューラ(バックグラウンド自律取得)の検証は独自フィードを登録するので、
 # 上記の「ちょうどN件」前提の厳密なカウントアサーションを崩さないよう必ず最後に走らせる
 bash e2e/hurl/core/scheduler_e2e.sh
 ```

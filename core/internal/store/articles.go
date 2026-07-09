@@ -11,13 +11,25 @@ import (
 )
 
 // InsertArticles は (feed_id, guid) で冪等に記事を挿入し、実際に入った件数を返す。
+// フィードは巡回のたびに既知の記事も再配信することが多いため、挿入前に既存 guid を
+// 除いておく — IDENTITY のシーケンスは ON CONFLICT で捨てた行にも値を消費するので、
+// 事前チェック無しだと巡回のたびに大量の欠番が生まれる。ON CONFLICT DO NOTHING 自体は
+// 事前チェックとバッチ発行の間で起こりうる競合(同一フィードの同時登録)の安全網として残す。
 func (s *Store) InsertArticles(ctx context.Context, feedID int64, items []feed.Item) (int, error) {
 	if len(items) == 0 {
 		return 0, nil
 	}
 
+	newItems, err := s.filterNewGUIDs(ctx, feedID, items)
+	if err != nil {
+		return 0, err
+	}
+	if len(newItems) == 0 {
+		return 0, nil
+	}
+
 	batch := &pgx.Batch{}
-	for _, it := range items {
+	for _, it := range newItems {
 		batch.Queue(
 			`INSERT INTO articles (feed_id, guid, url, title, content, published_at)
 			 VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6)
@@ -30,7 +42,7 @@ func (s *Store) InsertArticles(ctx context.Context, feedID int64, items []feed.I
 	defer func() { _ = results.Close() }()
 
 	inserted := 0
-	for range items {
+	for range newItems {
 		tag, err := results.Exec()
 		if err != nil {
 			return inserted, fmt.Errorf("insert article: %w", err)
@@ -38,6 +50,43 @@ func (s *Store) InsertArticles(ctx context.Context, feedID int64, items []feed.I
 		inserted += int(tag.RowsAffected())
 	}
 	return inserted, nil
+}
+
+// filterNewGUIDs は items のうち、その feed でまだ保存されていないものだけを返す。
+func (s *Store) filterNewGUIDs(ctx context.Context, feedID int64, items []feed.Item) ([]feed.Item, error) {
+	guids := make([]string, len(items))
+	for i, it := range items {
+		guids[i] = it.GUID
+	}
+
+	rows, err := s.pool.Query(ctx,
+		`SELECT guid FROM articles WHERE feed_id = $1 AND guid = ANY($2)`,
+		feedID, guids,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("select existing guids: %w", err)
+	}
+	defer rows.Close()
+
+	existing := make(map[string]struct{}, len(items))
+	for rows.Next() {
+		var guid string
+		if err := rows.Scan(&guid); err != nil {
+			return nil, fmt.Errorf("scan existing guid: %w", err)
+		}
+		existing[guid] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate existing guids: %w", err)
+	}
+
+	newItems := make([]feed.Item, 0, len(items))
+	for _, it := range items {
+		if _, ok := existing[it.GUID]; !ok {
+			newItems = append(newItems, it)
+		}
+	}
+	return newItems, nil
 }
 
 // ListArticles は記事を新しい順に keyset ページングで返す(httpapi.ArticleLister)。
