@@ -13,6 +13,7 @@ export const FETCHING_FULLTEXT = '取り寄せています';
 export const SUMMARIZING = '要約しています';
 export const SUMMARIZE = '要約する';
 export const RETRY_SUMMARIZE = '再試行する';
+export const REGENERATE_SUMMARY = '要約をやり直す';
 export const LOADING_MORE = '続きを読み込んでいます';
 export const LOAD_MORE_FAILED = '続きを読み込めませんでした';
 export const RETRY_LOAD_MORE = '再試行する';

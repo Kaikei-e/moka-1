@@ -6,13 +6,17 @@
 	// SvelteKit は同一ルート内の遷移でこのコンポーネントインスタンスを再利用するため、
 	// articleId の変化を検知して状態をリセットする(記事ごとにボタンから出し直す)。
 	import DripIndicator from './DripIndicator.svelte';
-	import { RETRY_SUMMARIZE, SUMMARIZE, SUMMARIZING } from '$lib/copy';
+	import { REGENERATE_SUMMARY, RETRY_SUMMARIZE, SUMMARIZE, SUMMARIZING } from '$lib/copy';
 
 	let { articleId }: { articleId: number } = $props();
 
 	let text = $state<string | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	// 直前の試行が通常生成か「やり直し」かを覚えておく — 失敗後の再試行ボタンは
+	// 同じモードで再送する(やり直しの失敗を「要約する」で再試行すると、moka-core が
+	// 保存済みの古い要約をそのまま返すだけで何も変わらない)。
+	let lastForce = $state(false);
 
 	$effect(() => {
 		const id = articleId; // 依存の確立(記事切り替えのたびにリセットする)
@@ -20,6 +24,7 @@
 		text = null;
 		loading = false;
 		error = null;
+		lastForce = false;
 	});
 
 	// SSE の1イベント("event: foo\ndata: {...}"、\n\n区切り済み)を状態へ反映する。
@@ -47,14 +52,16 @@
 		}
 	}
 
-	async function summarize() {
+	async function summarize(force = false) {
 		// ストリーム中に記事が切り替わったら(コンポーネントは再利用される)残りは捨てて読むのをやめる
 		const id = articleId;
+		lastForce = force;
 		loading = true;
 		error = null;
 		text = null;
 		try {
-			const res = await fetch(`/articles/${id}/summary/stream`, { method: 'POST' });
+			const url = `/articles/${id}/summary/stream${force ? '?force=true' : ''}`;
+			const res = await fetch(url, { method: 'POST' });
 			if (id !== articleId) return;
 			if (!res.ok || !res.body) {
 				const body = await res.json().catch(() => ({}));
@@ -104,7 +111,7 @@
 		moka による要約
 	</h2>
 	{#if text === null && !loading}
-		<button class="summarize-button" onclick={summarize}
+		<button class="summarize-button" onclick={() => summarize(lastForce)}
 			>{error ? RETRY_SUMMARIZE : SUMMARIZE}</button
 		>
 	{/if}
@@ -119,6 +126,7 @@
 	{/if}
 	{#if text}
 		<p class="summary-text" data-testid="summary-text">{text}</p>
+		<button class="regenerate-button" onclick={() => summarize(true)}>{REGENERATE_SUMMARY}</button>
 	{/if}
 </section>
 
@@ -159,6 +167,20 @@
 		background: var(--geppaku);
 		color: var(--kon);
 		font: 500 12px/1 var(--font-ui);
+		cursor: pointer;
+	}
+	/* 記事が主役・AI は給仕(DESIGN_LANGUAGE 冒頭) — やり直しは控えめな二次操作にする。
+	   枠線・背景は持たせず、タップターゲットの高さだけ .summarize-button と揃える */
+	.regenerate-button {
+		display: block;
+		margin-top: 10px;
+		min-height: 44px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--kon);
+		font: 500 11px/1.5 var(--font-ui);
+		text-align: left;
 		cursor: pointer;
 	}
 </style>

@@ -28,15 +28,20 @@ func NewService(store Store, fullTexts FullTextLookup, complete Completer, log *
 }
 
 // Summarize は articleID の要約を作る。既に保存済みなら外部へは何も呼ばず、その行をそのまま
-// 返す(冪等 — fulltext.Service.FetchFullText と同じ思想)。articleContent はフィード由来の
-// 本文(呼び出し元が articles テーブルから引いて渡す) — 全文取り寄せ済みならそちらを優先する。
-func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent string) (Result, error) {
-	existing, found, err := s.store.LatestSummary(ctx, articleID)
-	if err != nil {
-		return Result{}, fmt.Errorf("lookup summary %d: %w", articleID, err)
-	}
-	if found {
-		return Result{Summary: existing, Created: false}, nil
+// 返す(冪等 — fulltext.Service.FetchFullText と同じ思想)。force が true の場合はこの冪等
+// 短絡を無視して常に LLM を呼び直す(読者が品質に満足できず明示的に「やり直す」場合。
+// article_summaries は INSERT-only なので新しい行が追記され、既存行は消えない — ADR00002)。
+// articleContent はフィード由来の本文(呼び出し元が articles テーブルから引いて渡す) —
+// 全文取り寄せ済みならそちらを優先する。
+func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent string, force bool) (Result, error) {
+	if !force {
+		existing, found, err := s.store.LatestSummary(ctx, articleID)
+		if err != nil {
+			return Result{}, fmt.Errorf("lookup summary %d: %w", articleID, err)
+		}
+		if found {
+			return Result{Summary: existing, Created: false}, nil
+		}
 	}
 
 	text, err := s.resolveText(ctx, articleID, articleContent)
@@ -66,6 +71,9 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 		meta = map[string]any{}
 	}
 	meta["think_stripped"] = stripped
+	if force {
+		meta["regenerated"] = true
+	}
 
 	persistCtx, cancel := persistContext(ctx)
 	defer cancel()
@@ -81,21 +89,24 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 }
 
 // SummarizeStream は Summarize のストリーミング版。既に保存済みなら(冪等)llm を
-// 呼ばず既存テキストを1回の onDelta で返す。新規生成時は生チャンクを
-// thinkStreamStripper に通し、think ブロックの外側だけを onDelta で逐次流す
-// (専用の /summary/stream エンドポイント用)。最終的な保存判定は Summarize と同じ
-// stripThink(完全な生テキスト) — ストリーミング中の見た目はあくまで補助であり、
-// 接続断・LLM失敗時は部分テキストを一切保存せず failed のみ記録する(ADR00014 §7 踏襲)。
+// 呼ばず既存テキストを1回の onDelta で返す。force が true なら Summarize と同様この
+// 短絡を無視して常に新規生成する。新規生成時は生チャンクを thinkStreamStripper に通し、
+// think ブロックの外側だけを onDelta で逐次流す(専用の /summary/stream エンドポイント用)。
+// 最終的な保存判定は Summarize と同じ stripThink(完全な生テキスト) — ストリーミング中の
+// 見た目はあくまで補助であり、接続断・LLM失敗時は部分テキストを一切保存せず failed のみ
+// 記録する(ADR00014 §7 踏襲)。
 func (s *Service) SummarizeStream(
-	ctx context.Context, articleID int64, articleContent string, onDelta func(delta string),
+	ctx context.Context, articleID int64, articleContent string, force bool, onDelta func(delta string),
 ) (Result, error) {
-	existing, found, err := s.store.LatestSummary(ctx, articleID)
-	if err != nil {
-		return Result{}, fmt.Errorf("lookup summary %d: %w", articleID, err)
-	}
-	if found {
-		onDelta(existing.Text)
-		return Result{Summary: existing, Created: false}, nil
+	if !force {
+		existing, found, err := s.store.LatestSummary(ctx, articleID)
+		if err != nil {
+			return Result{}, fmt.Errorf("lookup summary %d: %w", articleID, err)
+		}
+		if found {
+			onDelta(existing.Text)
+			return Result{Summary: existing, Created: false}, nil
+		}
 	}
 
 	text, err := s.resolveText(ctx, articleID, articleContent)
@@ -133,6 +144,9 @@ func (s *Service) SummarizeStream(
 		meta = map[string]any{}
 	}
 	meta["think_stripped"] = stripped
+	if force {
+		meta["regenerated"] = true
+	}
 
 	persistCtx, cancel := persistContext(ctx)
 	defer cancel()

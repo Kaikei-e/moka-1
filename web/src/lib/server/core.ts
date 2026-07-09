@@ -124,14 +124,15 @@ export function summarizeErrorMessage(status: number): string {
 	return summarizeErrorMessages[status] ?? '要約に失敗しました。再試行してください';
 }
 
-// 要約は冪等(moka-core 側で保存済みなら再生成しない) — 新規 201 / 既存 200
+// 要約は冪等(moka-core 側で保存済みなら再生成しない) — 新規 201 / 既存 200。
+// force=true なら既存があっても無視して常に新規生成する(読者が明示的に「やり直す」場合)。
 export async function summarizeArticle(
 	fetchFn: typeof fetch,
-	articleId: number
+	articleId: number,
+	force = false
 ): Promise<SummaryResult> {
-	const res = await fetchFn(`${baseURL()}/api/v1/articles/${articleId}/summary`, {
-		method: 'POST'
-	});
+	const url = `${baseURL()}/api/v1/articles/${articleId}/summary${force ? '?force=true' : ''}`;
+	const res = await fetchFn(url, { method: 'POST' });
 	if (res.status === 200 || res.status === 201) {
 		const body = summaryResponseSchema.parse(await res.json());
 		return { ok: true, created: res.status === 201, summary: body.summary };
@@ -145,11 +146,12 @@ export async function summarizeArticle(
 
 // ストリーミング要約(POST /api/v1/articles/{id}/summary/stream)は SSE をそのまま
 // バッファせず呼び出し元(BFFルート)へ返す — パースはしない、中継に徹する。
+// force は summarizeArticle と同じ意味(?force=true で常に新規生成)。
 export async function summarizeArticleStream(
 	fetchFn: typeof fetch,
-	articleId: number
+	articleId: number,
+	force = false
 ): Promise<Response> {
-	return fetchFn(`${baseURL()}/api/v1/articles/${articleId}/summary/stream`, {
-		method: 'POST'
-	});
+	const url = `${baseURL()}/api/v1/articles/${articleId}/summary/stream${force ? '?force=true' : ''}`;
+	return fetchFn(url, { method: 'POST' });
 }

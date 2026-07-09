@@ -42,6 +42,27 @@ POST {{host}}/api/v1/articles/{{article_id}}/summary
 HTTP 200
 [Asserts]
 jsonpath "$.summary.text" == "{{summary_text}}"
+[Captures]
+first_created_at: jsonpath "$.summary.created_at"
+
+# 5b. ?force=true — 既存要約があっても無視して常に新規生成する(読者が品質に満足できず
+# 明示的に「やり直す」場合)。article_summaries は INSERT-only なので新しい行が追記される
+# (ADR00002)。201・model_meta.regenerated == true・古い行とは違う created_at がその証拠
+# (mock-llm はテキスト自体は固定文言を返すため、行が本当に増えたことは 201 と
+# created_at の変化で確認する — feeds_and_articles.hurl の冪等確認と対になるシナリオ)
+POST {{host}}/api/v1/articles/{{article_id}}/summary?force=true
+HTTP 201
+[Asserts]
+jsonpath "$.summary.article_id" == {{article_id}}
+jsonpath "$.summary.model_meta.regenerated" == true
+jsonpath "$.summary.created_at" != "{{first_created_at}}"
+
+# 5c. force 無しの通常 POST に戻す — 200 のまま、かつ latest が更新されている
+# (5b で追記された新しい行が返る = ORDER BY created_at DESC LIMIT 1 が効いている)
+POST {{host}}/api/v1/articles/{{article_id}}/summary
+HTTP 200
+[Asserts]
+jsonpath "$.summary.model_meta.regenerated" == true
 
 # 6. 存在しない記事は 404
 POST {{host}}/api/v1/articles/999999/summary

@@ -17,28 +17,29 @@ import (
 
 // fakeSummarizer は ArticleSummarizer のテストフェイク。
 type fakeSummarizer struct {
-	summarize  func(ctx context.Context, articleID int64, articleContent string) (summarize.Result, error)
+	summarize  func(ctx context.Context, articleID int64, articleContent string, force bool) (summarize.Result, error)
 	gotArticle int64
 	gotContent string
+	gotForce   bool
 
-	stream      func(ctx context.Context, articleID int64, articleContent string, onDelta func(string)) (summarize.Result, error)
+	stream      func(ctx context.Context, articleID int64, articleContent string, force bool, onDelta func(string)) (summarize.Result, error)
 	streamDelta []string // stream が nil の時のデフォルトの逐次送出内容
 }
 
-func (f *fakeSummarizer) Summarize(ctx context.Context, articleID int64, articleContent string) (summarize.Result, error) {
-	f.gotArticle, f.gotContent = articleID, articleContent
+func (f *fakeSummarizer) Summarize(ctx context.Context, articleID int64, articleContent string, force bool) (summarize.Result, error) {
+	f.gotArticle, f.gotContent, f.gotForce = articleID, articleContent, force
 	if f.summarize == nil {
 		return summarize.Result{}, nil
 	}
-	return f.summarize(ctx, articleID, articleContent)
+	return f.summarize(ctx, articleID, articleContent, force)
 }
 
 func (f *fakeSummarizer) SummarizeStream(
-	ctx context.Context, articleID int64, articleContent string, onDelta func(string),
+	ctx context.Context, articleID int64, articleContent string, force bool, onDelta func(string),
 ) (summarize.Result, error) {
-	f.gotArticle, f.gotContent = articleID, articleContent
+	f.gotArticle, f.gotContent, f.gotForce = articleID, articleContent, force
 	if f.stream != nil {
-		return f.stream(ctx, articleID, articleContent, onDelta)
+		return f.stream(ctx, articleID, articleContent, force, onDelta)
 	}
 	for _, d := range f.streamDelta {
 		onDelta(d)
@@ -55,7 +56,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
 			return feed.Article{ID: id, Content: "本文"}, true, nil
 		}}
-		summarizer := &fakeSummarizer{summarize: func(_ context.Context, id int64, _ string) (summarize.Result, error) {
+		summarizer := &fakeSummarizer{summarize: func(_ context.Context, id int64, _ string, _ bool) (summarize.Result, error) {
 			return summarize.Result{Summary: summarize.Summary{ArticleID: id, Text: "要約"}, Created: true}, nil
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
@@ -80,7 +81,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
 			return feed.Article{ID: id, Content: "本文"}, true, nil
 		}}
-		summarizer := &fakeSummarizer{summarize: func(_ context.Context, id int64, _ string) (summarize.Result, error) {
+		summarizer := &fakeSummarizer{summarize: func(_ context.Context, id int64, _ string, _ bool) (summarize.Result, error) {
 			return summarize.Result{Summary: summarize.Summary{ArticleID: id, Text: "既存"}, Created: false}, nil
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
@@ -89,6 +90,39 @@ func TestHandleSummarizeArticle(t *testing.T) {
 			summarizer).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("no force param passes force=false", func(t *testing.T) {
+		t.Parallel()
+
+		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
+			return feed.Article{ID: id, Content: "本文"}, true, nil
+		}}
+		summarizer := &fakeSummarizer{}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
+		rec := httptest.NewRecorder()
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
+			summarizer).ServeHTTP(rec, req)
+
+		assert.False(t, summarizer.gotForce)
+	})
+
+	t.Run("?force=true passes force=true through to the summarizer", func(t *testing.T) {
+		t.Parallel()
+
+		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
+			return feed.Article{ID: id, Content: "本文"}, true, nil
+		}}
+		summarizer := &fakeSummarizer{summarize: func(_ context.Context, id int64, _ string, _ bool) (summarize.Result, error) {
+			return summarize.Result{Summary: summarize.Summary{ArticleID: id, Text: "やり直した要約"}, Created: true}, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary?force=true", nil)
+		rec := httptest.NewRecorder()
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
+			summarizer).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusCreated, rec.Code)
+		assert.True(t, summarizer.gotForce)
 	})
 
 	t.Run("unknown article returns 404 without calling the summarizer", func(t *testing.T) {
@@ -147,7 +181,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 			getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
 				return feed.Article{ID: id, Content: "本文"}, true, nil
 			}}
-			summarizer := &fakeSummarizer{summarize: func(_ context.Context, _ int64, _ string) (summarize.Result, error) {
+			summarizer := &fakeSummarizer{summarize: func(_ context.Context, _ int64, _ string, _ bool) (summarize.Result, error) {
 				return summarize.Result{}, tt.err
 			}}
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
@@ -170,7 +204,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 			return feed.Article{ID: id, Content: "本文"}, true, nil
 		}}
 		summarizer := &fakeSummarizer{stream: func(
-			_ context.Context, id int64, _ string, onDelta func(string),
+			_ context.Context, id int64, _ string, _ bool, onDelta func(string),
 		) (summarize.Result, error) {
 			onDelta("要約")
 			onDelta("結果")
@@ -191,6 +225,29 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 		assert.Contains(t, body, "event: done\n")
 		assert.Contains(t, body, "\"created\":true")
 		assert.Equal(t, int64(7), summarizer.gotArticle)
+		assert.False(t, summarizer.gotForce)
+	})
+
+	t.Run("?force=true passes force=true through to the summarizer", func(t *testing.T) {
+		t.Parallel()
+
+		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
+			return feed.Article{ID: id, Content: "本文"}, true, nil
+		}}
+		summarizer := &fakeSummarizer{stream: func(
+			_ context.Context, id int64, _ string, _ bool, onDelta func(string),
+		) (summarize.Result, error) {
+			onDelta("やり直した要約")
+			return summarize.Result{
+				Summary: summarize.Summary{ArticleID: id, Text: "やり直した要約"}, Created: true,
+			}, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary/stream?force=true", nil)
+		rec := httptest.NewRecorder()
+		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
+			summarizer).ServeHTTP(rec, req)
+
+		assert.True(t, summarizer.gotForce)
 	})
 
 	t.Run("mid-stream llm failure emits an error event instead of a done event", func(t *testing.T) {
@@ -200,7 +257,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 			return feed.Article{ID: id, Content: "本文"}, true, nil
 		}}
 		summarizer := &fakeSummarizer{stream: func(
-			_ context.Context, _ int64, _ string, onDelta func(string),
+			_ context.Context, _ int64, _ string, _ bool, onDelta func(string),
 		) (summarize.Result, error) {
 			onDelta("途中まで")
 			return summarize.Result{}, fmt.Errorf("down: %w", summarize.ErrLLMUnavailable)

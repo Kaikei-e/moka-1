@@ -130,7 +130,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{}
-		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "some content")
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "some content", false)
 		require.NoError(t, err)
 
 		assert.False(t, res.Created)
@@ -145,7 +145,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{found: true, text: "全文本体"}
 		comp := &fakeCompleter{result: CompletionResult{Text: "要約結果", Meta: map[string]any{"model": "m"}}}
-		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "フィード由来の短い content")
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "フィード由来の短い content", false)
 		require.NoError(t, err)
 
 		assert.True(t, res.Created)
@@ -160,7 +160,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{found: false}
 		comp := &fakeCompleter{result: CompletionResult{Text: "要約結果", Meta: map[string]any{}}}
-		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "フィード由来の content")
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "フィード由来の content", false)
 		require.NoError(t, err)
 
 		assert.Equal(t, "フィード由来の content", comp.gotText)
@@ -172,7 +172,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{found: false}
 		comp := &fakeCompleter{}
-		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "")
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "", false)
 		require.ErrorIs(t, err, ErrNoContent)
 		assert.Zero(t, comp.numCalls)
 
@@ -189,7 +189,7 @@ func TestServiceSummarize(t *testing.T) {
 		comp := &fakeCompleter{}
 		// 非ASCII 1 文字 ≒ 2 トークンの保守的見積りなので、予算の半分+1 文字で超過する
 		huge := strings.Repeat("あ", maxInputTokens/2+1)
-		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, huge)
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, huge, false)
 		require.ErrorIs(t, err, ErrArticleTooLong)
 		assert.Zero(t, comp.numCalls, "上限超過なら llm を叩かない")
 		require.Len(t, store.attempts, 1)
@@ -202,7 +202,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{err: assert.AnError}
-		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content")
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", false)
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 		require.Len(t, store.attempts, 1)
 		assert.Equal(t, "failed", store.attempts[0].outcome)
@@ -217,7 +217,7 @@ func TestServiceSummarize(t *testing.T) {
 			Text: "<think>推論過程</think>剥がされた後の要約",
 			Meta: map[string]any{"model": "m"},
 		}}
-		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content")
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", false)
 		require.NoError(t, err)
 
 		assert.Equal(t, "剥がされた後の要約", res.Summary.Text)
@@ -232,7 +232,7 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{result: CompletionResult{Text: "<think>途中で切れた"}}
-		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content")
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", false)
 		require.ErrorIs(t, err, ErrEmptyCompletion)
 		require.Len(t, store.attempts, 1)
 		assert.Equal(t, "failed", store.attempts[0].outcome)
@@ -245,13 +245,55 @@ func TestServiceSummarize(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{result: CompletionResult{Text: "素直な要約", Meta: map[string]any{"model": "m"}}}
-		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content")
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", false)
 		require.NoError(t, err)
 
 		assert.True(t, res.Created)
 		require.Len(t, store.attempts, 1)
 		assert.Equal(t, fakeAttempt{7, "summary", "succeeded", ""}, store.attempts[0])
 		assert.Equal(t, false, res.Summary.ModelMeta["think_stripped"])
+	})
+
+	t.Run("force bypasses the idempotent short-circuit and calls the llm even when a summary exists", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{result: CompletionResult{Text: "やり直した要約", Meta: map[string]any{"model": "m"}}}
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", true)
+		require.NoError(t, err)
+
+		assert.True(t, res.Created)
+		assert.Equal(t, 1, comp.numCalls, "force なら既存があっても llm を呼ぶ")
+		require.Len(t, store.inserted, 1, "既存行を置き換えず新しい行を追記する")
+		assert.Equal(t, "やり直した要約", store.inserted[0].Text)
+		assert.Equal(t, "やり直した要約", res.Summary.Text)
+	})
+
+	t.Run("force records regenerated true in model_meta", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{result: CompletionResult{Text: "やり直した要約", Meta: map[string]any{"model": "m"}}}
+		res, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", true)
+		require.NoError(t, err)
+
+		assert.Equal(t, true, res.Summary.ModelMeta["regenerated"])
+	})
+
+	t.Run("force still records a failed attempt and inserts nothing when the llm fails", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{err: assert.AnError}
+		_, err := newTestService(store, ft, comp).Summarize(t.Context(), 7, "content", true)
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+
+		assert.Empty(t, store.inserted, "失敗時は既存の要約行を消さない・新規行も入れない")
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "failed", store.attempts[0].outcome)
 	})
 }
 
@@ -289,7 +331,7 @@ func TestServiceSummarizePersistsAfterDisconnect(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		store := &fakeStore{}
 		comp := &cancelingCompleter{cancel: cancel, err: context.Canceled}
-		_, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content")
+		_, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content", false)
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 
 		require.Len(t, store.attempts, 1, "切断でも failed イベントを記録する")
@@ -305,7 +347,7 @@ func TestServiceSummarizePersistsAfterDisconnect(t *testing.T) {
 			cancel: cancel,
 			result: CompletionResult{Text: "完成した要約", Meta: map[string]any{"model": "m"}},
 		}
-		res, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content")
+		res, err := newTestService(store, &fakeFullTexts{}, comp).Summarize(ctx, 7, "content", false)
 		require.NoError(t, err, "生成が完走したなら切断されていても保存する")
 
 		assert.True(t, res.Created)
@@ -321,7 +363,7 @@ func TestServiceSummarizePersistsAfterDisconnect(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		store := &fakeStore{}
 		comp := &cancelingCompleter{cancel: cancel, err: context.Canceled}
-		_, err := newTestService(store, &fakeFullTexts{}, comp).SummarizeStream(ctx, 7, "content", func(string) {})
+		_, err := newTestService(store, &fakeFullTexts{}, comp).SummarizeStream(ctx, 7, "content", false, func(string) {})
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 
 		require.Len(t, store.attempts, 1)
@@ -340,7 +382,7 @@ func TestServiceSummarizeStream(t *testing.T) {
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{}
 		var deltas []string
-		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", false, func(d string) {
 			deltas = append(deltas, d)
 		})
 		require.NoError(t, err)
@@ -360,7 +402,7 @@ func TestServiceSummarizeStream(t *testing.T) {
 			result:       CompletionResult{Text: "要約結果です", Meta: map[string]any{"model": "m"}},
 		}
 		var deltas []string
-		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", false, func(d string) {
 			deltas = append(deltas, d)
 		})
 		require.NoError(t, err)
@@ -385,7 +427,7 @@ func TestServiceSummarizeStream(t *testing.T) {
 			result:       CompletionResult{Text: "<think>推論</think>本文の要約", Meta: map[string]any{"model": "m"}},
 		}
 		var deltas []string
-		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", false, func(d string) {
 			deltas = append(deltas, d)
 		})
 		require.NoError(t, err)
@@ -406,7 +448,7 @@ func TestServiceSummarizeStream(t *testing.T) {
 			result:       CompletionResult{Text: "<think>途中で切れた推論"},
 		}
 		var deltas []string
-		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(d string) {
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", false, func(d string) {
 			deltas = append(deltas, d)
 		})
 		require.ErrorIs(t, err, ErrEmptyCompletion)
@@ -422,7 +464,7 @@ func TestServiceSummarizeStream(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{}
 		comp := &fakeCompleter{streamErr: assert.AnError}
-		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", func(string) {})
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", false, func(string) {})
 		require.ErrorIs(t, err, ErrLLMUnavailable)
 		assert.Empty(t, store.inserted)
 		require.Len(t, store.attempts, 1)
@@ -435,8 +477,40 @@ func TestServiceSummarizeStream(t *testing.T) {
 		store := &fakeStore{}
 		ft := &fakeFullTexts{found: false}
 		comp := &fakeCompleter{}
-		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "", func(string) {})
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "", false, func(string) {})
 		require.ErrorIs(t, err, ErrNoContent)
 		assert.Zero(t, comp.streamCalls)
+	})
+
+	t.Run("force bypasses the idempotent short-circuit and streams a freshly generated summary", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{result: CompletionResult{Text: "やり直した要約", Meta: map[string]any{"model": "m"}}}
+		var deltas []string
+		res, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", true, func(d string) {
+			deltas = append(deltas, d)
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, comp.streamCalls, "force なら既存があっても llm を呼ぶ")
+		assert.Equal(t, "やり直した要約", strings.Join(deltas, ""))
+		require.Len(t, store.inserted, 1, "既存行を置き換えず新しい行を追記する")
+		assert.Equal(t, true, res.Summary.ModelMeta["regenerated"])
+	})
+
+	t.Run("force still discards partial text and records failed when the llm fails mid-stream", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeStore{latest: Summary{ArticleID: 7, Text: "既存の要約"}, latestFound: true}
+		ft := &fakeFullTexts{}
+		comp := &fakeCompleter{streamErr: assert.AnError}
+		_, err := newTestService(store, ft, comp).SummarizeStream(t.Context(), 7, "content", true, func(string) {})
+		require.ErrorIs(t, err, ErrLLMUnavailable)
+
+		assert.Empty(t, store.inserted, "失敗時は既存の要約行を消さない・新規行も入れない")
+		require.Len(t, store.attempts, 1)
+		assert.Equal(t, "failed", store.attempts[0].outcome)
 	})
 }

@@ -4,13 +4,14 @@ import { json } from '@sveltejs/kit';
 import { summarizeArticleStream, summarizeErrorMessage } from '$lib/server/core';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ fetch, params }) => {
+export const POST: RequestHandler = async ({ fetch, params, url }) => {
 	const id = Number(params.id);
 	if (!Number.isInteger(id) || id < 1) {
 		return json({ error: '記事が見つかりません' }, { status: 400 });
 	}
 
-	const upstream = await summarizeArticleStream(fetch, id);
+	const force = url.searchParams.get('force') === 'true';
+	const upstream = await summarizeArticleStream(fetch, id, force);
 	if (upstream.status !== 200) {
 		return json({ error: summarizeErrorMessage(upstream.status) }, { status: upstream.status });
 	}

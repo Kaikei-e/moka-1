@@ -226,4 +226,147 @@ describe('SummaryCard.svelte', () => {
 		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
 		await expect.element(page.getByTestId('summary-text')).not.toBeInTheDocument();
 	});
+
+	it('shows a quiet regenerate control once a summary is displayed (品質に満足できないときのやり直し)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() =>
+				Promise.resolve(
+					sseResponse(200, [
+						{ event: 'delta', data: { text: '最初の要約' } },
+						{
+							event: 'done',
+							data: {
+								summary: {
+									article_id: 7,
+									text: '最初の要約',
+									model_meta: {},
+									created_at: '2026-07-01T09:00:00Z'
+								},
+								created: true
+							}
+						}
+					])
+				)
+			)
+		);
+
+		render(SummaryCard, { articleId: 7 });
+		await page.getByRole('button', { name: '要約する' }).click();
+
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('最初の要約');
+		await expect.element(page.getByRole('button', { name: '要約をやり直す' })).toBeVisible();
+		// 失敗リトライ用のボタン(要約する/再試行する)とは共存しない
+		await expect.element(page.getByRole('button', { name: '要約する' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: '再試行する' })).not.toBeInTheDocument();
+	});
+
+	it('regenerate posts with force=true and replaces the displayed summary on success', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(
+				sseResponse(200, [
+					{ event: 'delta', data: { text: '最初の要約' } },
+					{
+						event: 'done',
+						data: {
+							summary: {
+								article_id: 7,
+								text: '最初の要約',
+								model_meta: {},
+								created_at: '2026-07-01T09:00:00Z'
+							},
+							created: true
+						}
+					}
+				])
+			)
+			.mockResolvedValueOnce(
+				sseResponse(200, [
+					{ event: 'delta', data: { text: 'やり直した要約' } },
+					{
+						event: 'done',
+						data: {
+							summary: {
+								article_id: 7,
+								text: 'やり直した要約',
+								model_meta: { regenerated: true },
+								created_at: '2026-07-01T09:05:00Z'
+							},
+							created: true
+						}
+					}
+				])
+			);
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(SummaryCard, { articleId: 7 });
+		await page.getByRole('button', { name: '要約する' }).click();
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('最初の要約');
+
+		await page.getByRole('button', { name: '要約をやり直す' }).click();
+
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('やり直した要約');
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		const secondCallUrl = fetchMock.mock.calls[1][0] as string;
+		expect(secondCallUrl).toContain('force=true');
+	});
+
+	it('a failed regeneration clears the previous summary and offers retry (still force=true)', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(
+				sseResponse(200, [
+					{ event: 'delta', data: { text: '最初の要約' } },
+					{
+						event: 'done',
+						data: {
+							summary: {
+								article_id: 7,
+								text: '最初の要約',
+								model_meta: {},
+								created_at: '2026-07-01T09:00:00Z'
+							},
+							created: true
+						}
+					}
+				])
+			)
+			.mockResolvedValueOnce(jsonResponse(502, { error: '要約に失敗しました' }))
+			.mockResolvedValueOnce(
+				sseResponse(200, [
+					{ event: 'delta', data: { text: '再試行後の要約' } },
+					{
+						event: 'done',
+						data: {
+							summary: {
+								article_id: 7,
+								text: '再試行後の要約',
+								model_meta: { regenerated: true },
+								created_at: '2026-07-01T09:10:00Z'
+							},
+							created: true
+						}
+					}
+				])
+			);
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(SummaryCard, { articleId: 7 });
+		await page.getByRole('button', { name: '要約する' }).click();
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('最初の要約');
+
+		await page.getByRole('button', { name: '要約をやり直す' }).click();
+
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.element(page.getByTestId('summary-text')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: '再試行する' })).toBeVisible();
+
+		await page.getByRole('button', { name: '再試行する' }).click();
+
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('再試行後の要約');
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+		const thirdCallUrl = fetchMock.mock.calls[2][0] as string;
+		expect(thirdCallUrl).toContain('force=true');
+	});
 });

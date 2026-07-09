@@ -15,15 +15,23 @@ import (
 
 // ArticleSummarizer は要約ユースケースの消費側ポート(具象は *summarize.Service、main で注入)。
 type ArticleSummarizer interface {
-	Summarize(ctx context.Context, articleID int64, articleContent string) (summarize.Result, error)
+	// force が true なら既存の要約があっても無視し、常に新規生成する(読者が品質に
+	// 満足できず明示的に「やり直す」場合。クエリパラメータ ?force=true で起動する)。
+	Summarize(ctx context.Context, articleID int64, articleContent string, force bool) (summarize.Result, error)
 	// SummarizeStream は Summarize のストリーミング版。onDelta は think 除去済みの
 	// 文字列断片を到着順に呼ばれる(専用の /summary/stream ハンドラ用)。
 	SummarizeStream(
-		ctx context.Context, articleID int64, articleContent string, onDelta func(delta string),
+		ctx context.Context, articleID int64, articleContent string, force bool, onDelta func(delta string),
 	) (summarize.Result, error)
 }
 
+// forceRegenerate は ?force=true クエリパラメータを読む(要約の明示的なやり直し用)。
+func forceRegenerate(r *http.Request) bool {
+	return r.URL.Query().Get("force") == "true"
+}
+
 // handleSummarizeArticle は POST /api/v1/articles/{id}/summary。冪等: 新規 201 / 既存 200。
+// ?force=true を付けると既存要約があっても無視して常に新規生成する(この場合も 201)。
 // 記事が無ければ 404(要約対象のフィード由来 content は articles テーブルから引く。
 // 全文取り寄せ済みならそちらを優先するかどうかは summarize.Service の責務)。
 func handleSummarizeArticle(articles ArticleGetter, summarizer ArticleSummarizer) http.HandlerFunc {
@@ -46,7 +54,7 @@ func handleSummarizeArticle(articles ArticleGetter, summarizer ArticleSummarizer
 
 		clearWriteDeadline(w)
 
-		res, err := summarizer.Summarize(r.Context(), id, a.Content)
+		res, err := summarizer.Summarize(r.Context(), id, a.Content, forceRegenerate(r))
 		if err != nil {
 			status, msg := summarizeErrorStatus(err)
 			writeError(w, status, msg)
@@ -67,7 +75,8 @@ func handleSummarizeArticle(articles ArticleGetter, summarizer ArticleSummarizer
 // 冪等な場合も含め常に text/event-stream で応答する: 既存要約があれば1回の delta
 // イベントで全文を送ってから done、新規生成なら think 除去済みの断片を逐次 delta で
 // 送る。ヘッダ送出後は HTTP ステータスを変更できないため、途中失敗は SSE の
-// error イベントで伝える(HTTP ステータス自体は 200 のまま)。
+// error イベントで伝える(HTTP ステータス自体は 200 のまま)。?force=true で既存要約
+// があっても無視し常に新規生成する(handleSummarizeArticle と同じ規約)。
 func handleSummarizeArticleStream(articles ArticleGetter, summarizer ArticleSummarizer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -107,7 +116,7 @@ func handleSummarizeArticleStream(articles ArticleGetter, summarizer ArticleSumm
 			flusher.Flush()
 		}
 
-		res, err := summarizer.SummarizeStream(r.Context(), id, a.Content, func(delta string) {
+		res, err := summarizer.SummarizeStream(r.Context(), id, a.Content, forceRegenerate(r), func(delta string) {
 			writeEvent("delta", map[string]string{"text": delta})
 		})
 		if err != nil {
