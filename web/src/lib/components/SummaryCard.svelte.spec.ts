@@ -120,7 +120,7 @@ describe('SummaryCard.svelte', () => {
 		const errorBlock = page.getByRole('alert');
 		await expect.element(errorBlock).toHaveTextContent('失敗:');
 		await expect.element(errorBlock).toHaveTextContent('時間をおいて再試行してください');
-		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: '再試行する' })).toBeVisible();
 	});
 
 	it('retries on button click after a failure', async () => {
@@ -150,7 +150,7 @@ describe('SummaryCard.svelte', () => {
 		await page.getByRole('button', { name: '要約する' }).click();
 		await expect.element(page.getByRole('alert')).toBeVisible();
 
-		await page.getByRole('button', { name: '要約する' }).click();
+		await page.getByRole('button', { name: '再試行する' }).click();
 
 		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('再試行後の要約');
 		expect(fetchMock).toHaveBeenCalledTimes(2);

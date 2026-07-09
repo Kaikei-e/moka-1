@@ -6,7 +6,7 @@
 	// SvelteKit は同一ルート内の遷移でこのコンポーネントインスタンスを再利用するため、
 	// articleId の変化を検知して状態をリセットする(記事ごとにボタンから出し直す)。
 	import DripIndicator from './DripIndicator.svelte';
-	import { SUMMARIZE, SUMMARIZING } from '$lib/copy';
+	import { RETRY_SUMMARIZE, SUMMARIZE, SUMMARIZING } from '$lib/copy';
 
 	let { articleId }: { articleId: number } = $props();
 
@@ -104,7 +104,9 @@
 		moka による要約
 	</h2>
 	{#if text === null && !loading}
-		<button class="summarize-button" onclick={summarize}>{SUMMARIZE}</button>
+		<button class="summarize-button" onclick={summarize}
+			>{error ? RETRY_SUMMARIZE : SUMMARIZE}</button
+		>
 	{/if}
 	{#if loading}
 		<DripIndicator label={SUMMARIZING} testid="summary-drip" />
