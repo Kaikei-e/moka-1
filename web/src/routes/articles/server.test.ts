@@ -36,7 +36,9 @@ describe('GET /articles (infinite scroll BFF)', () => {
 							title: 't',
 							content: '',
 							published_at: null,
-							created_at: '2026-07-01T00:00:00Z'
+							created_at: '2026-07-01T00:00:00Z',
+							feed_title: 'Example',
+							read: false
 						}
 					],
 					next_cursor: 'xyz'

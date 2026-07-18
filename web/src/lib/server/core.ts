@@ -49,6 +49,31 @@ export async function listFeeds(fetchFn: typeof fetch): Promise<Feed[]> {
 	return feedsResponseSchema.parse(await res.json()).feeds;
 }
 
+// 既読打刻(冪等、204)。読書ビューを開いた事実を moka-core に残すだけで、失敗しても
+// 読書を妨げない — フェイルソフトの判断(黙って握りつぶす)は呼び出し側の BFF ルートが行う
+export async function markArticleRead(fetchFn: typeof fetch, id: number): Promise<boolean> {
+	const res = await fetchFn(`${baseURL()}/api/v1/articles/${id}/read`, { method: 'POST' });
+	return res.status === 204;
+}
+
+export type DeleteFeedResult = { ok: true } | { ok: false; status: number; message: string };
+
+// moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)
+const deleteFeedErrorMessages: Record<number, string> = {
+	404: 'フィードが見つかりません。再読み込みしてください'
+};
+
+// フィードの削除(店との別れ)。204 のみ成功 — CASCADE で記事・要約・既読の事実も消える
+export async function deleteFeed(fetchFn: typeof fetch, id: number): Promise<DeleteFeedResult> {
+	const res = await fetchFn(`${baseURL()}/api/v1/feeds/${id}`, { method: 'DELETE' });
+	if (res.status === 204) return { ok: true };
+	return {
+		ok: false,
+		status: res.status,
+		message: deleteFeedErrorMessages[res.status] ?? '削除に失敗しました。再試行してください'
+	};
+}
+
 // moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)
 const registerErrorMessages: Record<number, string> = {
 	400: 'URL が正しくありません',

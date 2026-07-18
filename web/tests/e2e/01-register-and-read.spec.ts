@@ -33,6 +33,12 @@ test('記事を選ぶと読書ビューが開き、moka の要約が運ばれて
 	// 本文(記事の声)
 	await expect(page.getByRole('heading', { name: 'Third article' })).toBeVisible();
 
+	// 既読の沈み: 開いた瞬間にサイドバーの行が楽観的に沈む(バッジ・数は出ない)
+	await expect(page.getByRole('link', { name: 'Third article' })).toHaveAttribute(
+		'data-read',
+		'true'
+	);
+
 	// 要約カード: 明示ボタンのみが引き金(全文取り寄せと同じ作法、自動生成しない)。
 	// 存在と形をアサートし、生成内容の文言には依存しない
 	await expect(page.getByText('moka による要約')).toBeVisible();
@@ -41,19 +47,9 @@ test('記事を選ぶと読書ビューが開き、moka の要約が運ばれて
 	await expect(summaryText).toBeVisible({ timeout: 20_000 });
 	await expect(summaryText).not.toHaveText('');
 
-	// Q&A 入力バー(こちらは M2 まで準備中のまま)
-	await expect(page.getByPlaceholder('この記事について訊く…')).toBeVisible();
-});
-
-test('対訳へ切り替えると未訳段落のドリップが段落位置に置かれる', async ({ page }) => {
-	await page.goto('/');
-	await page.getByRole('link', { name: 'Third article' }).click();
-	await expect(page.getByRole('heading', { name: 'Third article' })).toBeVisible();
-
-	// 対訳へ切り替えると未訳段落のドリップが段落位置に置かれる(§5.3)。この UI 切り替え自体は
-	// フロントのみで完結し llm を呼ばない(untranslated-drip は「翻訳未着手」を示すプレースホルダ)
-	await page.getByRole('button', { name: '対訳' }).click();
-	await expect(page.getByTestId('untranslated-drip').first()).toBeVisible();
+	// 対訳と訊く(AskBar)は LLM 実装まで取り下げ中 — 読書ビューには現れない
+	await expect(page.getByRole('button', { name: '対訳' })).not.toBeVisible();
+	await expect(page.getByPlaceholder('この記事について訊く…')).not.toBeVisible();
 });
 
 test('読書ビューで全文を取り寄せると本文が置き換わり、原文は新しいタブで開く', async ({ page }) => {

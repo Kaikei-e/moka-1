@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSafeExternalUrl } from './url';
+import { hostnameOf, isSafeExternalUrl } from './url';
 
 // フィード由来の URL は信用しない — href として描画してよいのは http/https のみ
 describe('isSafeExternalUrl', () => {
@@ -23,5 +23,22 @@ describe('isSafeExternalUrl', () => {
 		expect(isSafeExternalUrl('example.com/no-scheme')).toBe(false);
 		expect(isSafeExternalUrl('not a url')).toBe(false);
 		expect(isSafeExternalUrl('')).toBe(false);
+	});
+});
+
+// フィード名が無い記事リスト行の代替表示(表示専用、href には使わない)
+describe('hostnameOf', () => {
+	it('extracts the hostname of an absolute URL', () => {
+		expect(hostnameOf('https://blog.example.com/entry/1?a=b')).toBe('blog.example.com');
+	});
+
+	it('returns null for relative paths and garbage', () => {
+		expect(hostnameOf('/articles/7')).toBeNull();
+		expect(hostnameOf('not a url')).toBeNull();
+		expect(hostnameOf('')).toBeNull();
+	});
+
+	it('returns null when the URL has no hostname', () => {
+		expect(hostnameOf('mailto:someone@example.com')).toBeNull();
 	});
 });

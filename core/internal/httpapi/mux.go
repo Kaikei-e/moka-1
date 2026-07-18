@@ -52,8 +52,8 @@ func handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// handleAPIStub は未実装 API の明示的な 501。エッジ(Plecto)は /api/* を
-// strip せずここへ素通しする契約(plecto/manifest.toml)。
+// handleAPIStub は未実装 API の明示的な 501。呼び出し元は moka-web の BFF のみ
+// (ADR00011 — /api はエッジに公開しない。再公開時も /api prefix は strip しない契約)。
 func handleAPIStub(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{
 		"error": "not implemented yet",

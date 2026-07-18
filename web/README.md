@@ -1,42 +1,21 @@
-# sv
+# moka-web
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+moka-1 の Web UI(SvelteKit SSR)。サイドバーの記事リストと読書カラムの2ペインで「静かに読む場所」を提供する。moka-core へはサーバー側(BFF: `+page.server.ts` / `+server.ts`)からのみ到達し、ブラウザは moka-web としか話さない。
 
-## Creating a project
+- デザインの正典: [DESIGN_LANGUAGE.md](./DESIGN_LANGUAGE.md)(瑠璃と金泥)
+- ドメイン用語: リポジトリルートの `CONTEXT.md`
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+## コマンド
 
 ```sh
-# recreate this project
-pnpm dlx sv@0.16.1 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" sveltekit-adapter="adapter:node" --no-download-check --install pnpm web
+pnpm install       # 依存の導入
+pnpm dev           # 開発サーバー(moka-core は別途 docker compose で)
+pnpm lint          # prettier --check + eslint
+pnpm check         # svelte-check(型)
+pnpm test          # vitest --run(コンポーネントは実ブラウザ実行)
+pnpm test:e2e      # Playwright(実スタック前提。手順は ../e2e/README.md)
+pnpm format        # prettier --write
+pnpm build         # 本番ビルド(adapter-node)
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+環境変数 `MOKA_CORE_URL`(既定 `http://localhost:8080`)で moka-core の宛先を指定する。本番は compose.yaml が配線する。

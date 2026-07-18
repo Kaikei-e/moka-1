@@ -16,7 +16,9 @@ export const articleSchema = z.object({
 	title: z.string(),
 	content: z.string(),
 	published_at: z.string().nullable(),
-	created_at: z.string()
+	created_at: z.string(),
+	feed_title: z.string().nullable(), // フィード名(リスト行の手がかり)。欠損時は URL のホスト名で代替
+	read: z.boolean() // 既読の事実の有無。リストでは濃淡で静かに沈めるのみ(数を数えない)
 });
 
 export const fullTextSchema = z.object({
