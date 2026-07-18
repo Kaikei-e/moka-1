@@ -173,7 +173,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
       interval: 30s
-      start_period: 20m # 初回はモデル自動 DL(~5.2GB)+ロードで長い
+      start_period: 20m # 初回はモデル自動 DL(~2.5GB)+ロードで長い
       start_interval: 5s
 
 volumes:

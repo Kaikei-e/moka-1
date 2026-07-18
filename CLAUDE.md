@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## アーキテクチャ
 
-**常駐サービス上限 = 5**(compose.yaml)。one-shot ジョブ(`migrate`)は数えない。これを超える機能は新サービスではなく既存コンテナ内のモジュールとして実装する。
+**常駐サービス上限 = 5**(compose.yaml)。one-shot ジョブ(`migrate`、`plecto-certs-init`)は数えない。これを超える機能は新サービスではなく既存コンテナ内のモジュールとして実装する。
 
 | サービス | 実体 | 役割 |
 |---|---|---|
@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `db` | PostgreSQL + pgvector | 記事・フィード・埋め込み・ジョブ状態、すべてここ。検索エンジン/キャッシュは導入しない |
 | `llm` | llama.cpp server (Vulkan) | ローカル推論のみ。クラウドAPI不使用 |
 
-**コアパス vs 増強(フェイルソフト)**: フィード取得→正規化→DB書き込みまでがコアパス。要約・タグ・埋め込み(濃縮)以降は増強であり、`llm` が死んでも素のRSSリーダーとして動き続けること。イベントソーシングは無し — `articles` への素朴な upsert + `enrichment_status` カラムで冪等に再処理する。
+**コアパス vs 増強(フェイルソフト)**: フィード取得→正規化→DB書き込みまでがコアパス。要約・タグ・埋め込み(濃縮)以降は増強であり、`llm` が死んでも素のRSSリーダーとして動き続けること。イベントソーシング(CQRS)は無し — スキーマはイミュータブルデータモデル(ADR00002)で、濃縮の成果は INSERT-only のイベント表(`enrichment_attempts` / `article_summaries` 等)への追記、pending は成果イベントの不在から導出する(`enrichment_status` カラムは持たない)。
 
 - 本番では moka-core はホスト非公開(Plecto 経由のみ)。SSRF ガード有効。E2E 用の穴あけは `compose.e2e.yaml` オーバーレイに隔離されている
 - スキーマは `db/schema.sql` が単一ソース。Atlas が versioned migrations を生成し、compose の one-shot `migrate` ジョブが起動時に自動適用。moka-core は自前マイグレーション機構を持たない
@@ -35,7 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### スタック起動
 
 ```bash
-docker compose up -d --wait   # 初回はモデルDL(~5.2GB)で数分かかる
+docker compose up -d --wait   # 初回はモデルDL(~2.5GB)で数分かかる
 ```
 
 ### core/ (Go 1.26) — ローカルCIパリティ

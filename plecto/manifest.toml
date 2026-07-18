@@ -38,13 +38,13 @@ path = "/healthz"
 
 # ---- routes(filters 空 = 素通し。最長 path_prefix が勝つ)----
 
-# API は moka-core へ。/api prefix は strip しない(moka-core 側が /api/... で受ける契約)
-[[route]]
-upstream = "moka-core"
-[route.match]
-path_prefix = "/api"
+# /api はエッジに公開しない(ADR00011: ブラウザ経路は moka-web の BFF のみ。
+# BFF → moka-core は compose 内部ネットワーク直通なのでエッジ経由の /api は使われない)。
+# moka-core upstream の定義はヘルス監視のため残す。/api の再公開は Phase 2 以降の
+# 認証・レート制限フィルタ(tenets §3.5)とセットで判断する。
+# 再公開時の契約: /api prefix は strip しない(moka-core 側が /api/... で受ける — ADR00010)
 
-# それ以外はすべて UI(SvelteKit SSR)へ
+# すべて UI(SvelteKit SSR)へ
 [[route]]
 upstream = "moka-web"
 [route.match]
