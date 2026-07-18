@@ -11,7 +11,9 @@ const article = {
 	title: 'Seven',
 	content: '<p>概要の本文です。</p>',
 	published_at: '2026-07-01T09:00:00Z',
-	created_at: '2026-07-01T09:00:00Z'
+	created_at: '2026-07-01T09:00:00Z',
+	feed_title: 'Example Feed',
+	read: false
 };
 
 const otherArticle = {
@@ -22,7 +24,9 @@ const otherArticle = {
 	title: 'Eight',
 	content: '<p>別記事の概要です。</p>',
 	published_at: '2026-07-02T09:00:00Z',
-	created_at: '2026-07-02T09:00:00Z'
+	created_at: '2026-07-02T09:00:00Z',
+	feed_title: 'Example Feed',
+	read: false
 };
 
 // layout data(サイドバーの記事一覧)も PageProps.data に合流するのでテストにも含める
@@ -56,17 +60,24 @@ function sseResponse(status: number, events: SSEEvent[]) {
 }
 
 // 全文取り寄せ・要約はどちらも明示ボタンが引き金(自動取得しない)で、独立したボタンから
-// 別々の URL を叩く。同じ Page 内で両方を検証できるよう、呼び先を URL で振り分ける。
+// 別々の URL を叩く。既読打刻(/read)は開いた瞬間に fire-and-forget で必ず飛ぶ。
+// 同じ Page 内で全部を検証できるよう、呼び先を URL で振り分ける。
 function routeFetch(
-	overrides: Partial<{ fulltext: () => Promise<Response>; summary: () => Promise<Response> }> = {}
+	overrides: Partial<{
+		fulltext: () => Promise<Response>;
+		summary: () => Promise<Response>;
+		read: () => Promise<Response>;
+	}> = {}
 ) {
 	const fulltext =
 		overrides.fulltext ?? (() => Promise.reject(new Error('unmocked fulltext fetch')));
 	const summary = overrides.summary ?? (() => Promise.reject(new Error('unmocked summary fetch')));
+	const read = overrides.read ?? (() => Promise.resolve(new Response(null, { status: 204 })));
 	return vi.fn((input: RequestInfo | URL) => {
 		const url = typeof input === 'string' ? input : input.toString();
 		if (url.includes('/fulltext')) return fulltext();
 		if (url.includes('/summary')) return summary();
+		if (url.includes('/read')) return read();
 		return Promise.reject(new Error(`unmocked fetch: ${url}`));
 	});
 }
@@ -278,5 +289,58 @@ describe('articles/[id] reading view — 要約(moka による濃縮)', () => {
 		await expect
 			.element(page.getByTestId('summary-text'))
 			.toHaveTextContent('読書ビューに運ばれてきた要約');
+	});
+});
+
+describe('articles/[id] reading view — 既読打刻(fire-and-forget)', () => {
+	it('stamps the article as read when the reading view opens', async () => {
+		const readFetch = vi.fn(async () => new Response(null, { status: 204 }));
+		vi.stubGlobal('fetch', routeFetch({ read: readFetch }));
+
+		render(Page, { data: pageData });
+
+		await expect.element(page.getByRole('heading', { name: 'Seven' })).toBeVisible();
+		await vi.waitFor(() => expect(readFetch).toHaveBeenCalledTimes(1));
+	});
+
+	it('stamps the new article when navigating between articles', async () => {
+		const readUrls: string[] = [];
+		const fetchMock = routeFetch();
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: RequestInfo | URL) => {
+				const url = typeof input === 'string' ? input : input.toString();
+				if (url.includes('/read')) readUrls.push(url);
+				return fetchMock(input);
+			})
+		);
+
+		const { rerender } = await render(Page, { data: pageData });
+		await vi.waitFor(() => expect(readUrls).toContain('/articles/7/read'));
+
+		await rerender({ data: otherPageData });
+
+		await vi.waitFor(() => expect(readUrls).toContain('/articles/8/read'));
+	});
+
+	it('stays silent when the stamp fails — reading is never disturbed (fail-soft)', async () => {
+		vi.stubGlobal('fetch', routeFetch({ read: () => Promise.reject(new Error('network down')) }));
+
+		render(Page, { data: pageData });
+
+		await expect.element(page.getByText('概要の本文です。')).toBeVisible();
+		// エラー表示は一切出ない(role=alert が存在しない)
+		expect(page.getByRole('alert').elements()).toHaveLength(0);
+	});
+});
+
+describe('articles/[id] reading view — 取り下げ中の UI(対訳・訊く)', () => {
+	it('renders neither the 対訳 toggle nor the ask bar until the LLM backend exists', async () => {
+		vi.stubGlobal('fetch', routeFetch());
+		render(Page, { data: pageData });
+
+		await expect.element(page.getByRole('heading', { name: 'Seven' })).toBeVisible();
+		expect(page.getByRole('button', { name: '対訳' }).elements()).toHaveLength(0);
+		expect(page.getByPlaceholder('この記事について訊く…').elements()).toHaveLength(0);
 	});
 });

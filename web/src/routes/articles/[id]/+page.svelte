@@ -1,45 +1,46 @@
 <script lang="ts">
-	// 読書ビュー: 本文(記事の声 = 明朝)が主役。AI 要素(要約・対訳・Q&A)は給仕として従属する。
-	// 対訳は左右2カラム(モバイルは段落交互)。未訳段落にはドリップを段落位置に置く(§5.3)
+	// 読書ビュー: 本文(記事の声 = 明朝)が主役。AI 要素(要約)は給仕として従属する。
+	// 流れは タイトル → メタ → 要約カード → 本文 → 全文を取り寄せる、の一本(v3.3.0)。
+	// 対訳と訊く(AskBar)は LLM 実装まで取り下げ中 — コンポーネントと規定は保持している。
 	//
-	// 全文取り寄せ: 明示ボタンのみが引き金(自動取得しない)。取得済みなら本文を置き換える —
-	// 対訳の「原文」カラムにも同じ paragraphs が使われるので、取り寄せ後は対訳にも反映される。
+	// 全文取り寄せ: 明示ボタンのみが引き金(自動取得しない)。取得済みなら本文を置き換える。
 	// 冪等(サーバー側で保存済みなら再取得しない)なので、成功後はボタンごと消して再クリックを防ぐ。
 	//
+	// 既読打刻: 読書ビューを開いた事実だけを fire-and-forget で moka-core に残す(冪等)。
+	// SSR の load に副作用を持たせず、失敗は黙って握りつぶす — 読書を妨げない。
+	//
 	// SvelteKit は同一ルート(/articles/[id])内の遷移でこのコンポーネントインスタンスを
-	// 再利用し、data だけ差し替える。そのため取り寄せ状態はローカル $state に持たせたままだと
-	// 記事を切り替えても前の記事の全文が残ってしまう — data.article.id の変化を検知して
-	// リセットする(§5.3 の未訳表示・取り寄せ表示のどちらも記事単位の状態であるため)。
-	import AskBar from '$lib/components/AskBar.svelte';
+	// 再利用し、data だけ差し替える。取り寄せ状態は記事単位なので data.article.id の変化を
+	// 検知してリセットする(既読打刻も同じ契機で記事ごとに一度ずつ飛ぶ)。
 	import DripIndicator from '$lib/components/DripIndicator.svelte';
 	import SummaryCard from '$lib/components/SummaryCard.svelte';
 	import { toParagraphs } from '$lib/article-text';
 	import { sanitizeArticleHtml } from '$lib/sanitize';
-	import { isSafeExternalUrl } from '$lib/url';
+	import { hostnameOf, isSafeExternalUrl } from '$lib/url';
 	import { formatDate } from '$lib/format';
-	import { UNTRANSLATED, FETCH_FULLTEXT, FETCHING_FULLTEXT } from '$lib/copy';
+	import { FETCH_FULLTEXT, FETCHING_FULLTEXT } from '$lib/copy';
 
 	let { data } = $props();
 
-	let taiyaku = $state(false);
 	let fullText = $state<string | null>(null);
 	let fetching = $state(false);
 	let fetchError = $state<string | null>(null);
 
 	$effect(() => {
 		const id = data.article.id; // 依存の確立(記事切り替えのたびにリセットする)
-		void id;
-		taiyaku = false;
 		fullText = null;
 		fetching = false;
 		fetchError = null;
+		// 既読打刻: fire-and-forget、フェイルソフト(エラーは読書に一切波及させない)
+		void fetch(`/articles/${id}/read`, { method: 'POST' }).catch(() => {});
 	});
 
-	// 対訳(段落ペア表示)は常にプレーン段落の粒度で扱う。取り寄せ済みなら全文が原文カラムになる
 	const paragraphs = $derived(toParagraphs(fullText ?? data.article.content));
-	// 通常表示は取り寄せ済みなら構造(見出し・リスト・コードブロック等)を保ったまま描画する。
+	// 取り寄せ済みなら構造(見出し・リスト・コードブロック等)を保ったまま描画する。
 	// RSS 由来の content は構造情報を持たないため対象外(タグを剥がしたプレーン段落のまま)
 	const fullTextHtml = $derived(fullText ? sanitizeArticleHtml(fullText) : null);
+	// メタ行の店の名(リスト行と同じ手がかり): フィード名、無ければホスト名
+	const sourceLabel = $derived(data.article.feed_title ?? hostnameOf(data.article.url) ?? '');
 
 	async function fetchFullText() {
 		// 応答待ちの間に記事が切り替わったら(コンポーネントは再利用される)応答を丸ごと捨てる
@@ -68,53 +69,25 @@
 	<title>{data.article.title} — moka-1</title>
 </svelte:head>
 
-<article class="reading-col" class:wide={taiyaku}>
+<article class="reading-col">
 	<header class="article-header">
 		<h1>{data.article.title}</h1>
-		<div class="meta-row">
-			<p class="meta">
-				{#if data.article.published_at}
-					<time datetime={data.article.published_at}>{formatDate(data.article.published_at)}</time>
-				{/if}
-				{#if isSafeExternalUrl(data.article.url)}
-					<a href={data.article.url} target="_blank" rel="noopener noreferrer">原文を開く</a>
-				{/if}
-			</p>
-			<div class="article-actions">
-				{#if fullText === null && !fetching}
-					<button class="fulltext-button" onclick={fetchFullText}>{FETCH_FULLTEXT}</button>
-				{/if}
-				<button class="taiyaku-toggle" aria-pressed={taiyaku} onclick={() => (taiyaku = !taiyaku)}>
-					対訳
-				</button>
-			</div>
-		</div>
-		{#if fetching}
-			<DripIndicator label={FETCHING_FULLTEXT} testid="fulltext-drip" />
-		{/if}
-		{#if fetchError}
-			<p class="fulltext-error" role="alert">
-				<span aria-hidden="true">⚠</span>
-				失敗: {fetchError}
-			</p>
-		{/if}
+		<p class="meta">
+			{#if sourceLabel}
+				<span class="source">{sourceLabel}</span>
+			{/if}
+			{#if data.article.published_at}
+				<time datetime={data.article.published_at}>{formatDate(data.article.published_at)}</time>
+			{/if}
+			{#if isSafeExternalUrl(data.article.url)}
+				<a href={data.article.url} target="_blank" rel="noopener noreferrer">原文を開く</a>
+			{/if}
+		</p>
 	</header>
 
 	<SummaryCard articleId={data.article.id} />
 
-	{#if taiyaku}
-		<div class="pairs">
-			{#each paragraphs as p, i (i)}
-				<div class="pair">
-					<p class="original">{p}</p>
-					<div class="translation">
-						<span class="yaku-label">訳</span>
-						<DripIndicator label={UNTRANSLATED} testid="untranslated-drip" />
-					</div>
-				</div>
-			{/each}
-		</div>
-	{:else if fullTextHtml}
+	{#if fullTextHtml}
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- fullTextHtml は sanitizeArticleHtml (DOMPurify、許可タグ限定) を通した後の値のみ -->
 		<div class="body article-html">{@html fullTextHtml}</div>
 	{:else}
@@ -125,9 +98,21 @@
 		</div>
 	{/if}
 
-	<footer class="ask-dock">
-		<AskBar articleId={data.article.id} />
-	</footer>
+	{#if fullText === null}
+		<footer class="fulltext-zone">
+			{#if fetching}
+				<DripIndicator label={FETCHING_FULLTEXT} testid="fulltext-drip" />
+			{:else}
+				<button class="fulltext-button" onclick={fetchFullText}>{FETCH_FULLTEXT}</button>
+			{/if}
+			{#if fetchError}
+				<p class="fulltext-error" role="alert">
+					<span aria-hidden="true">⚠</span>
+					失敗: {fetchError}
+				</p>
+			{/if}
+		</footer>
+	{/if}
 </article>
 
 <style>
@@ -135,36 +120,32 @@
 		max-width: var(--measure-ja);
 		margin: 0 auto;
 	}
-	/* 対訳は2カラム分の幅を使う(測度は片側で維持される) */
-	.reading-col.wide {
-		max-width: calc(var(--measure-ja) * 2 + 32px);
-	}
 	.article-header h1 {
 		margin: 0 0 8px;
 		font: 500 22px/1.6 var(--font-article);
 	}
-	.meta-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		margin-bottom: 24px;
-	}
 	.meta {
-		margin: 0;
+		margin: 0 0 24px;
 		font: 400 12px/1.6 var(--font-ui);
 		color: var(--konnezu);
 		display: flex;
+		flex-wrap: wrap;
 		gap: 12px;
 	}
-	.article-actions {
-		display: flex;
-		align-items: center;
-		gap: 8px;
+	.body {
+		margin-top: 24px;
 	}
-	.taiyaku-toggle,
+	.body p {
+		margin-block: 1em;
+		font: 400 15px/2.05 var(--font-article);
+		color: var(--kon);
+	}
+
+	/* 本文の後、静かな取り寄せ導線(本文が主役 — メタ行に混ぜず、読み終わりに置く) */
+	.fulltext-zone {
+		margin-top: 32px;
+	}
 	.fulltext-button {
-		flex: none;
 		min-height: 44px;
 		padding: 0 14px;
 		border: 1px solid var(--hatoba);
@@ -175,9 +156,6 @@
 		cursor: pointer;
 		transition: background-color var(--dur-fast) var(--ease-calm);
 	}
-	.taiyaku-toggle[aria-pressed='true'] {
-		background: var(--ruri-tint);
-	}
 	/* エラー = 紺紙金泥ブロック(DESIGN_LANGUAGE §2.4)。読書カラム内にインラインで置く */
 	.fulltext-error {
 		margin: 12px 0 0;
@@ -186,15 +164,6 @@
 		background: var(--kon);
 		color: var(--kindei-bright);
 		font: 400 12px/1.6 var(--font-ui);
-	}
-	.body {
-		margin-top: 24px;
-	}
-	.body p,
-	.original {
-		margin-block: 1em;
-		font: 400 15px/2.05 var(--font-article);
-		color: var(--kon);
 	}
 
 	/* 取り寄せた全文の構造化描画({@html} で流し込むので :global で子要素にスタイルを当てる) */
@@ -263,52 +232,5 @@
 		background: var(--geppaku);
 		padding: 1px 4px;
 		border-radius: 4px;
-	}
-	.pairs {
-		margin-top: 24px;
-	}
-	.pair {
-		margin-block: 1em;
-	}
-	/* 訳文は AI 生成物 = fujinezu 面(§5.1)。ボーダーなし — 濃淡差のみで区切る */
-	.translation {
-		background: var(--fujinezu);
-		border-radius: var(--radius-card);
-		padding: 12px;
-	}
-	.yaku-label {
-		display: inline-block;
-		margin-bottom: 4px;
-		font: 500 11px/1.5 var(--font-ui);
-		color: var(--kindei); /* 金泥の印(§5.2) */
-	}
-	.ask-dock {
-		margin-top: 32px;
-	}
-
-	@media (min-width: 900px) {
-		.pair {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 32px;
-			align-items: start;
-		}
-		.pair:hover {
-			background: var(--hatoba); /* 段落ペアの同期ハイライト(§5.1) */
-		}
-		/* 「訳」の金泥の印はモバイルの段落交互のみ(§5.2)。金がひしめかない(原則5) */
-		.yaku-label {
-			display: none;
-		}
-	}
-
-	/* モバイル: 入力バーは画面下部に固定(safe-area 考慮、§4.3) */
-	@media (max-width: 899.98px) {
-		.ask-dock {
-			position: sticky;
-			bottom: 0;
-			padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
-			background: var(--kumoi);
-		}
 	}
 </style>

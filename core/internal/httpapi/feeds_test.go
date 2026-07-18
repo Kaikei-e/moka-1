@@ -125,8 +125,7 @@ func TestHandleRegisterFeed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mux := NewMux(&fakeRegistrar{register: tt.register}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-				&fakeSummarizer{})
+			mux := newTestMux(muxDeps{feeds: &fakeRegistrar{register: tt.register}})
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/v1/feeds", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -153,7 +152,7 @@ func TestHandleRegisterFeed(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodPost, "/api/v1/feeds", strings.NewReader(`{"url": "https://example.com/feed.xml"}`))
 		rec := httptest.NewRecorder()
-		NewMux(reg, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{feeds: reg}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusCreated, rec.Code)
 		var got map[string]json.RawMessage
@@ -198,7 +197,7 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{feedList: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -217,7 +216,7 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"feeds": []}`, rec.Body.String())
@@ -232,7 +231,82 @@ func TestHandleListFeeds(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/feeds", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, lister, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{feedList: lister}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+// fakeFeedDeleter は FeedDeleter のテストフェイク。
+type fakeFeedDeleter struct {
+	delete func(ctx context.Context, id int64) (bool, error)
+	gotID  int64
+}
+
+func (f *fakeFeedDeleter) DeleteFeed(ctx context.Context, id int64) (bool, error) {
+	f.gotID = id
+	if f.delete == nil {
+		return false, nil
+	}
+	return f.delete(ctx, id)
+}
+
+func TestHandleDeleteFeed(t *testing.T) {
+	t.Parallel()
+
+	t.Run("existing feed returns 204 with an empty body", func(t *testing.T) {
+		t.Parallel()
+
+		deleter := &fakeFeedDeleter{delete: func(_ context.Context, _ int64) (bool, error) {
+			return true, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodDelete, "/api/v1/feeds/3", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{feedDelete: deleter}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		assert.Empty(t, rec.Body.String())
+		assert.Equal(t, int64(3), deleter.gotID)
+	})
+
+	t.Run("unknown feed returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodDelete, "/api/v1/feeds/999999", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		var got map[string]string
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+		assert.Equal(t, "feed not found", got["error"])
+	})
+
+	t.Run("non-integer id returns 400 without hitting the store", func(t *testing.T) {
+		t.Parallel()
+
+		deleter := &fakeFeedDeleter{}
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodDelete, "/api/v1/feeds/not-a-number", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{feedDelete: deleter}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Zero(t, deleter.gotID)
+	})
+
+	t.Run("store failure returns 500", func(t *testing.T) {
+		t.Parallel()
+
+		deleter := &fakeFeedDeleter{delete: func(_ context.Context, _ int64) (bool, error) {
+			return false, assert.AnError
+		}}
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodDelete, "/api/v1/feeds/3", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{feedDelete: deleter}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})

@@ -1,12 +1,13 @@
 <script lang="ts">
-	// 登録は /feeds の default action に集約(ホームの空状態からも同じ導線)。
+	// 登録は /feeds の named action(?/register)に集約(ホームの空状態からも同じ導線)。
 	// あえて use:enhance を付けない: 他ルートへの POST は native に任せると
-	// 成功(303 → /feeds)も失敗(/feeds 上でエラー表示)も1経路で済み、JS 無しでも同じに動く
+	// 成功(303 → /feeds)も失敗(/feeds 上でエラー表示)も1経路で済み、JS 無しでも同じに動く。
+	// named にしたのは削除 action(?/delete)と同居させるため — default とは共存できない
 	let { errorMessage = null }: { errorMessage?: string | null } = $props();
 	const uid = $props.id();
 </script>
 
-<form class="register" method="POST" action="/feeds">
+<form class="register" method="POST" action="/feeds?/register">
 	<label for="{uid}-url">フィードの URL</label>
 	<div class="row">
 		<input

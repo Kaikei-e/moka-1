@@ -105,7 +105,7 @@ func TestHandleListArticles(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodGet, "/api/v1/articles"+tt.query, nil)
 			rec := httptest.NewRecorder()
-			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+			newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			if tt.wantStatus == http.StatusOK && tt.list == nil {
@@ -129,7 +129,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?cursor="+cur.Encode(), nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.NotNil(t, gotCursor)
@@ -147,7 +147,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?limit=2", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -171,7 +171,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?limit=2", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -196,7 +196,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles?limit=2", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got map[string]json.RawMessage
@@ -211,7 +211,7 @@ func TestHandleListArticles(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		assert.JSONEq(t, `{"articles": [], "next_cursor": null}`, rec.Body.String())
@@ -220,13 +220,17 @@ func TestHandleListArticles(t *testing.T) {
 	t.Run("articles are serialized with snake_case fields", func(t *testing.T) {
 		t.Parallel()
 
+		feedTitle := "Example Feed"
 		lister := &fakeLister{list: func(_ context.Context, _ int, _ *feed.ArticleCursor) ([]feed.Article, error) {
-			return []feed.Article{{ID: 7, FeedID: 1, GUID: "urn:x:7", URL: "https://example.com/7", Title: "Seven"}}, nil
+			return []feed.Article{{
+				ID: 7, FeedID: 1, FeedTitle: &feedTitle,
+				GUID: "urn:x:7", URL: "https://example.com/7", Title: "Seven", Read: true,
+			}}, nil
 		}}
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, lister, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -237,6 +241,29 @@ func TestHandleListArticles(t *testing.T) {
 		assert.InDelta(t, float64(1), got.Articles[0]["feed_id"], 0)
 		assert.Equal(t, "urn:x:7", got.Articles[0]["guid"])
 		assert.Contains(t, got.Articles[0], "published_at")
+		assert.Equal(t, "Example Feed", got.Articles[0]["feed_title"])
+		assert.Equal(t, true, got.Articles[0]["read"])
+	})
+
+	t.Run("feed_title is null and read false when derived data is absent", func(t *testing.T) {
+		t.Parallel()
+
+		lister := &fakeLister{list: func(_ context.Context, _ int, _ *feed.ArticleCursor) ([]feed.Article, error) {
+			return []feed.Article{{ID: 7, FeedID: 1, GUID: "urn:x:7", URL: "https://example.com/7", Title: "Seven"}}, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(),
+			http.MethodGet, "/api/v1/articles", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{articles: lister}).ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var got struct {
+			Articles []map[string]json.RawMessage `json:"articles"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+		require.Len(t, got.Articles, 1)
+		assert.Equal(t, "null", string(got.Articles[0]["feed_title"]), "title 未設定フィードは null")
+		assert.Equal(t, "false", string(got.Articles[0]["read"]), "未読 = false")
 	})
 }
 
@@ -258,14 +285,18 @@ func TestHandleGetArticle(t *testing.T) {
 	t.Run("returns the article wrapped in an article key", func(t *testing.T) {
 		t.Parallel()
 
+		feedTitle := "Example Feed"
 		getter := &fakeGetter{get: func(_ context.Context, id int64) (feed.Article, bool, error) {
 			assert.Equal(t, int64(7), id)
-			return feed.Article{ID: 7, FeedID: 1, GUID: "urn:x:7", Title: "Seven", Content: "body"}, true, nil
+			return feed.Article{
+				ID: 7, FeedID: 1, FeedTitle: &feedTitle,
+				GUID: "urn:x:7", Title: "Seven", Content: "body", Read: true,
+			}, true, nil
 		}}
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/7", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		var got struct {
@@ -274,6 +305,8 @@ func TestHandleGetArticle(t *testing.T) {
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
 		assert.Equal(t, "urn:x:7", got.Article["guid"])
 		assert.Equal(t, "body", got.Article["content"])
+		assert.Equal(t, "Example Feed", got.Article["feed_title"])
+		assert.Equal(t, true, got.Article["read"])
 	})
 
 	t.Run("unknown id returns 404", func(t *testing.T) {
@@ -282,7 +315,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/999999", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		var got map[string]string
@@ -296,7 +329,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/not-a-number", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -310,7 +343,7 @@ func TestHandleGetArticle(t *testing.T) {
 		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/v1/articles/7", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{}, &fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})

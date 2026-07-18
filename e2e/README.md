@@ -34,12 +34,13 @@ docker volume rm moka_e2e-db-data 2>/dev/null || true
 docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait moka-core e2e-fixtures
 
 # 3. Hurl 実行(DB 依存シナリオなので --jobs 1)。要約系(summarize.hurl)は e2e-llm-mock に対して走る。
-# articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より後に置く
+# articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より後に置く。
+# read_and_feed_delete.hurl は末尾で null-pubdate フィードを削除するので hurl 群の最後に置く
 hurl --test --jobs 1 \
   --variable host=http://localhost:8080 \
   --variable fixture_url=http://e2e-fixtures/feed.xml \
   --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
-  e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
+  e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl e2e/hurl/core/read_and_feed_delete.hurl
 
 # 4. 条件付きGETが効かない(=毎回200で同じ内容を返す)フィードの再取得でも articles.id の
 # 欠番が増えないことの検証。独自フィードを登録するので、上記の厳密なカウントアサーションの後に走らせる

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+	deleteFeed,
 	fetchFullText,
 	getArticle,
 	listArticlesPage,
 	listFeeds,
+	markArticleRead,
 	registerFeed,
 	summarizeArticle,
 	summarizeArticleStream
@@ -17,7 +19,9 @@ const article = {
 	title: 'Seven',
 	content: 'body',
 	published_at: '2026-07-01T09:00:00Z',
-	created_at: '2026-07-01T09:00:00Z'
+	created_at: '2026-07-01T09:00:00Z',
+	feed_title: 'Example',
+	read: false
 };
 
 const feed = {
@@ -89,6 +93,15 @@ describe('listArticlesPage', () => {
 		await expect(listArticlesPage(fetchStub(200, { articles: [article] }))).rejects.toThrow();
 	});
 
+	it('rejects a response missing the read/feed_title fields (contract drift guard)', async () => {
+		const legacyArticle: Partial<typeof article> = { ...article };
+		delete legacyArticle.feed_title;
+		delete legacyArticle.read;
+		await expect(
+			listArticlesPage(fetchStub(200, { articles: [legacyArticle], next_cursor: null }))
+		).rejects.toThrow();
+	});
+
 	it('rejects on a non-200 status', async () => {
 		await expect(listArticlesPage(fetchStub(500, { error: 'internal error' }))).rejects.toThrow();
 	});
@@ -141,6 +154,62 @@ describe('registerFeed', () => {
 		[500, '登録に失敗しました。再試行してください']
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await registerFeed(fetchStub(status, { error: 'x' }), 'https://example.com/f');
+		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('markArticleRead', () => {
+	function statusStub(status: number, capture?: { url?: string; method?: string }): typeof fetch {
+		return async (input, init) => {
+			if (capture) {
+				capture.url = String(input);
+				capture.method = init?.method ?? '';
+			}
+			return new Response(null, { status });
+		};
+	}
+
+	it('POSTs the read stamp and reports 204 as success (idempotent)', async () => {
+		const capture: { url?: string; method?: string } = {};
+		const ok = await markArticleRead(statusStub(204, capture), 7);
+
+		expect(ok).toBe(true);
+		expect(capture.url).toMatch(/\/api\/v1\/articles\/7\/read$/);
+		expect(capture.method).toBe('POST');
+	});
+
+	it('reports any other status as failure (the caller stays silent — fail-soft)', async () => {
+		expect(await markArticleRead(statusStub(404), 999)).toBe(false);
+		expect(await markArticleRead(statusStub(500), 7)).toBe(false);
+	});
+});
+
+describe('deleteFeed', () => {
+	function statusStub(status: number, capture?: { url?: string; method?: string }): typeof fetch {
+		return async (input, init) => {
+			if (capture) {
+				capture.url = String(input);
+				capture.method = init?.method ?? '';
+			}
+			return new Response(null, { status });
+		};
+	}
+
+	it('DELETEs the feed and maps 204 to ok', async () => {
+		const capture: { url?: string; method?: string } = {};
+		const got = await deleteFeed(statusStub(204, capture), 1);
+
+		expect(got).toEqual({ ok: true });
+		expect(capture.url).toMatch(/\/api\/v1\/feeds\/1$/);
+		expect(capture.method).toBe('DELETE');
+	});
+
+	it.each([
+		[404, 'フィードが見つかりません。再読み込みしてください'],
+		[500, '削除に失敗しました。再試行してください'],
+		[502, '削除に失敗しました。再試行してください']
+	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
+		const got = await deleteFeed(statusStub(status), 1);
 		expect(got).toEqual({ ok: false, status, message });
 	});
 });

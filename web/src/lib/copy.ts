@@ -17,3 +17,14 @@ export const REGENERATE_SUMMARY = '要約をやり直す';
 export const LOADING_MORE = '続きを読み込んでいます';
 export const LOAD_MORE_FAILED = '続きを読み込めませんでした';
 export const RETRY_LOAD_MORE = '再試行する';
+
+// ホームの空状態: 招待 + 今日のハイライトの静的予告(一文だけ。進行表現・操作は付けない)
+export const HIGHLIGHT_FORECAST = 'やがて毎朝、今日読むべき記事がここに揃います';
+
+// フィードの削除(店との別れ)。破壊的なので警告様式(§2.4)の二段確認を挟む
+export const DELETE_FEED = '削除する';
+export const DELETE_CANCEL = 'やめる';
+export const DELETE_CONFIRM_LABEL = '削除の確認';
+export const DELETE_FEED_WARNING =
+	'このフィードを削除すると、届いた記事・要約・既読の記録もすべて消えます。元に戻せません';
+export const DELETED = '削除しました';

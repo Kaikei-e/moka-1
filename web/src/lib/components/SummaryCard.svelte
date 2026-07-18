@@ -12,6 +12,9 @@
 
 	let text = $state<string | null>(null);
 	let loading = $state(false);
+	// ストリーミング(逐次表示)中は面に min-height を与えてレイアウトの跳ねを抑える。
+	// loading(最初のトークンまで)と違い、ストリームが閉じるまで立ちっぱなしのフラグ
+	let streaming = $state(false);
 	let error = $state<string | null>(null);
 	// 直前の試行が通常生成か「やり直し」かを覚えておく — 失敗後の再試行ボタンは
 	// 同じモードで再送する(やり直しの失敗を「要約する」で再試行すると、moka-core が
@@ -23,6 +26,7 @@
 		void id;
 		text = null;
 		loading = false;
+		streaming = false;
 		error = null;
 		lastForce = false;
 	});
@@ -57,6 +61,7 @@
 		const id = articleId;
 		lastForce = force;
 		loading = true;
+		streaming = true;
 		error = null;
 		text = null;
 		try {
@@ -93,12 +98,15 @@
 			error = '要約に失敗しました。再試行してください';
 			text = null;
 		} finally {
-			if (id === articleId) loading = false;
+			if (id === articleId) {
+				loading = false;
+				streaming = false;
+			}
 		}
 	}
 </script>
 
-<section class="summary-card">
+<section class="summary-card" data-testid="summary-card" data-streaming={streaming || undefined}>
 	<h2 class="card-label">
 		<svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none">
 			<path
@@ -136,6 +144,10 @@
 		background: var(--fujinezu);
 		border-radius: var(--radius-card);
 		padding: 14px;
+	}
+	/* ストリーミング中は数行ぶんの高さを先に確保し、逐次表示で本文が跳ねないようにする(§8.1) */
+	.summary-card[data-streaming] {
+		min-height: 128px;
 	}
 	.card-label {
 		display: flex;

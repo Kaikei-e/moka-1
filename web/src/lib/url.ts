@@ -9,3 +9,13 @@ export function isSafeExternalUrl(url: string): boolean {
 	}
 	return parsed.protocol === 'http:' || parsed.protocol === 'https:';
 }
+
+// 記事 URL からホスト名を取り出す(フィード名が無いときのリスト行の代替表示)。
+// 表示専用 — href には使わないので http(s) 以外も許すが、解釈できなければ null
+export function hostnameOf(url: string): string | null {
+	try {
+		return new URL(url).hostname || null;
+	} catch {
+		return null;
+	}
+}

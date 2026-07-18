@@ -190,14 +190,15 @@ jobs:
       - name: hurl
         # summarize.hurl は本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る。
         # articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より
-        # 後に置く(NULL published_at 記事が fallback で全記事中最新になり得るため、順序を守る)
+        # 後に置く(NULL published_at 記事が fallback で全記事中最新になり得るため、順序を守る)。
+        # read_and_feed_delete.hurl は末尾で null-pubdate フィードを削除するので hurl 群の最後に置く
         run: |
           mkdir -p e2e/hurl/reports
           hurl --test --jobs 1 --report-junit e2e/hurl/reports/junit.xml \
             --variable host=http://localhost:8080 \
             --variable fixture_url=http://e2e-fixtures/feed.xml \
             --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
-            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl
+            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl e2e/hurl/core/read_and_feed_delete.hurl
       - name: scheduler e2e(常駐スケジューラの自律再取得を検証)
         # 上記 hurl 群の後に走らせる — 独自フィードを追加登録するため、既存ファイルの
         # 「ちょうどN件」前提の厳密なカウントアサーションを崩さない順序を守る

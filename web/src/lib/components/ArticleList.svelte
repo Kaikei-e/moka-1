@@ -3,9 +3,10 @@
 	// SSR props(articles/nextCursor)が変わったら(例: 新規フィード登録後の再読み込み)、
 	// 積み上げた追加ページは破棄して1ページ目からやり直す — 重複や矛盾を避ける単純な方針
 	import { resolve } from '$app/paths';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { Article } from '$lib/api/schemas';
+	import { toArticleListItem } from '$lib/article-list-item';
 	import { EMPTY_ARTICLES, LOADING_MORE, LOAD_MORE_FAILED, RETRY_LOAD_MORE } from '$lib/copy';
-	import { formatDate } from '$lib/format';
 	import DripIndicator from './DripIndicator.svelte';
 
 	let {
@@ -34,6 +35,16 @@
 		loading = false;
 		generation += 1;
 	});
+
+	// 既読の楽観反映: 読書ビューが開いた(= currentId になった)記事はサーバーの打刻を待たずに
+	// 沈める。打刻そのもの(POST /articles/[id]/read)は読書ビュー側の fire-and-forget が担い、
+	// SSR の再読込後はサーバー由来の read がこの集合を追い越す
+	const readOverrides = new SvelteSet<number>();
+	$effect(() => {
+		if (currentId !== null) readOverrides.add(currentId);
+	});
+
+	const listItems = $derived(items.map((a) => toArticleListItem(a)));
 
 	async function loadMore() {
 		if (loading || cursor === null) return;
@@ -71,15 +82,16 @@
 {:else}
 	<nav aria-label="記事リスト">
 		<ul class="articles">
-			{#each items as a (a.id)}
+			{#each listItems as item (item.id)}
 				<li>
 					<a
-						href={resolve('/articles/[id]', { id: String(a.id) })}
-						aria-current={a.id === currentId ? 'page' : undefined}
+						href={resolve('/articles/[id]', { id: String(item.id) })}
+						aria-current={item.id === currentId ? 'page' : undefined}
+						data-read={item.read || readOverrides.has(item.id) ? 'true' : undefined}
 					>
-						<span class="title">{a.title}</span>
-						{#if a.published_at}
-							<span class="meta">{formatDate(a.published_at)}</span>
+						<span class="title">{item.title}</span>
+						{#if item.meta}
+							<span class="meta">{item.meta}</span>
 						{/if}
 					</a>
 				</li>
@@ -121,7 +133,7 @@
 	}
 	.articles a {
 		display: block;
-		padding: 10px 16px;
+		padding: 12px 16px;
 		text-decoration: none;
 		color: var(--kon);
 		border-bottom: 0.5px solid var(--hatoba);
@@ -133,9 +145,16 @@
 	.articles a[aria-current='page'] {
 		background: var(--ruri-tint);
 	}
+	/* 未読 = kon 500。リスト行は UI の声なのでゴシック(読書ビューの明朝タイトルと使い分ける) */
 	.title {
 		display: block;
-		font: 400 14px/1.7 var(--font-article);
+		font: 500 14px/1.7 var(--font-ui);
+		color: var(--kon);
+	}
+	/* 既読の沈み: 濃淡とウェイトだけで静かに沈める — バッジ・打ち消し線・数は使わない */
+	.articles a[data-read='true'] .title {
+		font-weight: 400;
+		color: var(--konnezu);
 	}
 	.meta {
 		display: block;

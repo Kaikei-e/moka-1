@@ -89,27 +89,42 @@ func (s *Store) filterNewGUIDs(ctx context.Context, feedID int64, items []feed.I
 	return newItems, nil
 }
 
+// articleCols は記事1行の SELECT 列。articles 行そのものに加え、フィード名
+// (feeds.title — 記事は必ずフィードに属すので JOIN は内部結合でよい)と
+// 既読フラグ(article_reads の行の有無)を導出して feed.Article を1回で満たす。
+const articleCols = `a.id, a.feed_id, f.title, a.guid, a.url, a.title, COALESCE(a.content, ''),
+	 a.published_at, a.created_at,
+	 EXISTS (SELECT 1 FROM article_reads r WHERE r.article_id = a.id)`
+
+// scanArticle は articleCols と同順で1行を読む。
+func scanArticle(row pgx.Row) (feed.Article, error) {
+	var a feed.Article
+	err := row.Scan(&a.ID, &a.FeedID, &a.FeedTitle, &a.GUID, &a.URL, &a.Title,
+		&a.Content, &a.PublishedAt, &a.CreatedAt, &a.Read)
+	return a, err
+}
+
 // ListArticles は記事を新しい順に keyset ページングで返す(httpapi.ArticleLister)。
 // OFFSET は使わない — 深いページで読み飛ばし量が線形に伸びる。並びキーは
 // COALESCE(published_at, created_at)(取得元の feed に pubDate が無い記事は
 // 取得できた時刻を代替キーにする) DESC, id DESC。カーソルはその「最後に返した行」
-// を指し、続きだけをインデックスレンジで引く。
+// を指し、続きだけをインデックスレンジで引く(feeds との JOIN は並びに関与しない)。
 func (s *Store) ListArticles(ctx context.Context, limit int, cursor *feed.ArticleCursor) ([]feed.Article, error) {
-	const cols = `id, feed_id, guid, url, title, COALESCE(content, ''), published_at, created_at`
-	const sortKey = `COALESCE(published_at, created_at)`
-	const order = ` ORDER BY ` + sortKey + ` DESC, id DESC LIMIT `
+	const from = ` FROM articles a JOIN feeds f ON f.id = a.feed_id`
+	const sortKey = `COALESCE(a.published_at, a.created_at)`
+	const order = ` ORDER BY ` + sortKey + ` DESC, a.id DESC LIMIT `
 
 	var (
 		query string
 		args  []any
 	)
 	if cursor == nil {
-		query = `SELECT ` + cols + ` FROM articles` + order + `$1`
+		query = `SELECT ` + articleCols + from + order + `$1`
 		args = []any{limit}
 	} else {
 		// 続き = より古い並びキー、同時刻ならより小さい id
-		query = `SELECT ` + cols + ` FROM articles
-		 WHERE ` + sortKey + ` < $1 OR (` + sortKey + ` = $1 AND id < $2)` + order + `$3`
+		query = `SELECT ` + articleCols + from + `
+		 WHERE ` + sortKey + ` < $1 OR (` + sortKey + ` = $1 AND a.id < $2)` + order + `$3`
 		args = []any{cursor.SortKey, cursor.ID, limit}
 	}
 
@@ -121,9 +136,8 @@ func (s *Store) ListArticles(ctx context.Context, limit int, cursor *feed.Articl
 
 	var out []feed.Article
 	for rows.Next() {
-		var a feed.Article
-		if err := rows.Scan(&a.ID, &a.FeedID, &a.GUID, &a.URL, &a.Title,
-			&a.Content, &a.PublishedAt, &a.CreatedAt); err != nil {
+		a, err := scanArticle(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan article: %w", err)
 		}
 		out = append(out, a)
@@ -136,12 +150,10 @@ func (s *Store) ListArticles(ctx context.Context, limit int, cursor *feed.Articl
 
 // GetArticle は記事を1件引く。無ければ found=false(エラーではない)。
 func (s *Store) GetArticle(ctx context.Context, id int64) (feed.Article, bool, error) {
-	var a feed.Article
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, feed_id, guid, url, title, COALESCE(content, ''), published_at, created_at
-		 FROM articles WHERE id = $1`,
+	a, err := scanArticle(s.pool.QueryRow(ctx,
+		`SELECT `+articleCols+` FROM articles a JOIN feeds f ON f.id = a.feed_id WHERE a.id = $1`,
 		id,
-	).Scan(&a.ID, &a.FeedID, &a.GUID, &a.URL, &a.Title, &a.Content, &a.PublishedAt, &a.CreatedAt)
+	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return feed.Article{}, false, nil
 	}

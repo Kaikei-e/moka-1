@@ -125,6 +125,19 @@ func (s *Store) DueFeeds(ctx context.Context) ([]feed.Feed, error) {
 	return out, nil
 }
 
+// DeleteFeed はフィードを削除する(httpapi.FeedDeleter)。フィード行のハード削除で、
+// 配下の記事・取得履歴・濃縮成果・既読は FK の ON DELETE CASCADE がまとめて消す。
+// イベントの UPDATE ではなくリソースそのものの削除なので、冒頭のイミュータブル
+// データモデルの方針(UPDATE 文は書かない)とは矛盾しない。
+// 戻り値は「行を実際に消したか」(false = 元から無い)。
+func (s *Store) DeleteFeed(ctx context.Context, id int64) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM feeds WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("delete feed %d: %w", id, err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // ListFeeds は登録済みフィードを新しい順に返す(httpapi.FeedLister)。
 func (s *Store) ListFeeds(ctx context.Context) ([]feed.Feed, error) {
 	rows, err := s.pool.Query(ctx,

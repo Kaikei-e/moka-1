@@ -41,7 +41,7 @@ function jsonResponse(status: number, body: unknown) {
 	});
 }
 
-function nextArticle(id: number, title: string): Article {
+function nextArticle(id: number, title: string, overrides: Partial<Article> = {}): Article {
 	return {
 		id,
 		feed_id: 1,
@@ -50,31 +50,22 @@ function nextArticle(id: number, title: string): Article {
 		title,
 		content: '',
 		published_at: '2026-06-30T09:00:00Z',
-		created_at: '2026-06-30T09:00:00Z'
+		created_at: '2026-06-30T09:00:00Z',
+		feed_title: 'Example Feed',
+		read: false,
+		...overrides
 	};
 }
 
 const articles: Article[] = [
-	{
-		id: 2,
-		feed_id: 1,
-		guid: 'urn:x:2',
-		url: 'https://example.com/2',
-		title: 'Newest',
-		content: '',
+	nextArticle(2, 'Newest', {
 		published_at: '2026-07-02T09:00:00Z',
 		created_at: '2026-07-02T09:00:00Z'
-	},
-	{
-		id: 1,
-		feed_id: 1,
-		guid: 'urn:x:1',
-		url: 'https://example.com/1',
-		title: 'Older',
-		content: '',
+	}),
+	nextArticle(1, 'Older', {
 		published_at: '2026-07-01T09:00:00Z',
 		created_at: '2026-07-01T09:00:00Z'
-	}
+	})
 ];
 
 describe('ArticleList.svelte', () => {
@@ -97,6 +88,58 @@ describe('ArticleList.svelte', () => {
 		render(ArticleList, { articles: [], currentId: null });
 
 		await expect.element(page.getByText(EMPTY_ARTICLES)).toBeInTheDocument();
+	});
+});
+
+describe('ArticleList.svelte — リスト行の手がかり(フィード名・相対日時・既読の沈み)', () => {
+	it('shows the feed name and a relative time as one quiet meta line', async () => {
+		const fresh = nextArticle(3, 'Fresh', {
+			published_at: new Date(Date.now() - 5 * 60_000).toISOString()
+		});
+		render(ArticleList, { articles: [fresh], currentId: null });
+
+		await expect.element(page.getByText('Example Feed・5分前')).toBeVisible();
+	});
+
+	it('falls back to the article hostname when the feed has no title', async () => {
+		const untitled = nextArticle(3, 'Untitled feed article', {
+			feed_title: null,
+			url: 'https://blog.example.com/entry/3',
+			published_at: new Date(Date.now() - 5 * 60_000).toISOString()
+		});
+		render(ArticleList, { articles: [untitled], currentId: null });
+
+		await expect.element(page.getByText('blog.example.com・5分前')).toBeVisible();
+	});
+
+	it('sinks read articles (data-read) and keeps unread ones prominent — no counts, no badges', async () => {
+		const mixed = [nextArticle(2, 'Read one', { read: true }), nextArticle(1, 'Unread one')];
+		render(ArticleList, { articles: mixed, currentId: null });
+
+		await expect
+			.element(page.getByRole('link', { name: /Read one/ }))
+			.toHaveAttribute('data-read', 'true');
+		await expect
+			.element(page.getByRole('link', { name: /Unread one/ }))
+			.not.toHaveAttribute('data-read');
+	});
+
+	it('optimistically sinks the article being read without waiting for the server stamp', async () => {
+		const { rerender } = render(ArticleList, { articles, currentId: null });
+		await expect
+			.element(page.getByRole('link', { name: /Older/ }))
+			.not.toHaveAttribute('data-read');
+
+		await rerender({ articles, currentId: 1 });
+
+		await expect
+			.element(page.getByRole('link', { name: /Older/ }))
+			.toHaveAttribute('data-read', 'true');
+		// 別の記事へ移っても、一度読んだ事実は沈んだまま
+		await rerender({ articles, currentId: 2 });
+		await expect
+			.element(page.getByRole('link', { name: /Older/ }))
+			.toHaveAttribute('data-read', 'true');
 	});
 });
 

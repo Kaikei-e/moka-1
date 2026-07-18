@@ -61,8 +61,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusCreated, rec.Code)
 		assert.Equal(t, int64(7), summarizer.gotArticle)
@@ -86,8 +85,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
@@ -101,8 +99,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		summarizer := &fakeSummarizer{}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.False(t, summarizer.gotForce)
 	})
@@ -118,8 +115,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary?force=true", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 		assert.True(t, summarizer.gotForce)
@@ -131,8 +127,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		summarizer := &fakeSummarizer{}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/999999/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Zero(t, summarizer.gotArticle)
@@ -143,8 +138,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/not-a-number/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-			&fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -157,8 +151,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			&fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
@@ -186,8 +179,7 @@ func TestHandleSummarizeArticle(t *testing.T) {
 			}}
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary", nil)
 			rec := httptest.NewRecorder()
-			NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-				summarizer).ServeHTTP(rec, req)
+			newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.wantStatus, rec.Code)
 		})
@@ -214,8 +206,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary/stream", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
@@ -244,8 +235,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary/stream?force=true", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.True(t, summarizer.gotForce)
 	})
@@ -264,8 +254,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 		}}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/7/summary/stream", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, getter, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{article: getter, summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code) // ヘッダ送出済みなのでHTTPステータスはOKのまま
 		body := rec.Body.String()
@@ -281,8 +270,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 		summarizer := &fakeSummarizer{}
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/999999/summary/stream", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-			summarizer).ServeHTTP(rec, req)
+		newTestMux(muxDeps{summarizer: summarizer}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.NotEqual(t, "text/event-stream", rec.Header().Get("Content-Type"))
@@ -293,8 +281,7 @@ func TestHandleSummarizeArticleStream(t *testing.T) {
 
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/articles/not-a-number/summary/stream", nil)
 		rec := httptest.NewRecorder()
-		NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-			&fakeSummarizer{}).ServeHTTP(rec, req)
+		newTestMux(muxDeps{}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})

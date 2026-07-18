@@ -227,6 +227,42 @@ describe('SummaryCard.svelte', () => {
 		await expect.element(page.getByTestId('summary-text')).not.toBeInTheDocument();
 	});
 
+	it('reserves the card height while streaming so the layout stays stable (§8.1)', async () => {
+		const sse = controlledSSEResponse(200);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => Promise.resolve(sse.response))
+		);
+
+		render(SummaryCard, { articleId: 7 });
+		const card = page.getByTestId('summary-card');
+		await expect.element(card).not.toHaveAttribute('data-streaming');
+
+		await page.getByRole('button', { name: '要約する' }).click();
+		await expect.element(card).toHaveAttribute('data-streaming');
+
+		sse.push({ event: 'delta', data: { text: '途中の要約' } });
+		await expect.element(page.getByTestId('summary-text')).toHaveTextContent('途中の要約');
+		// 逐次表示の間じゅう確保したまま(loading が消えても跳ねない)
+		await expect.element(card).toHaveAttribute('data-streaming');
+
+		sse.push({
+			event: 'done',
+			data: {
+				summary: {
+					article_id: 7,
+					text: '途中の要約',
+					model_meta: {},
+					created_at: '2026-07-01T09:00:00Z'
+				},
+				created: true
+			}
+		});
+		sse.close();
+
+		await expect.element(card).not.toHaveAttribute('data-streaming');
+	});
+
 	it('shows a quiet regenerate control once a summary is displayed (品質に満足できないときのやり直し)', async () => {
 		vi.stubGlobal(
 			'fetch',
