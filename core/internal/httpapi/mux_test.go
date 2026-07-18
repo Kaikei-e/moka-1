@@ -47,6 +47,12 @@ func TestNewMux(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
+			name:       "feed by id rejects POST",
+			method:     http.MethodPost,
+			path:       "/api/v1/feeds/3",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "article by id rejects POST",
 			method:     http.MethodPost,
 			path:       "/api/v1/articles/7",
@@ -65,6 +71,12 @@ func TestNewMux(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
+			name:       "read rejects GET",
+			method:     http.MethodGet,
+			path:       "/api/v1/articles/7/read",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
 			name:       "summary rejects GET",
 			method:     http.MethodGet,
 			path:       "/api/v1/articles/7/summary",
@@ -78,8 +90,7 @@ func TestNewMux(t *testing.T) {
 		},
 	}
 
-	mux := NewMux(&fakeRegistrar{}, &fakeFeedLister{}, &fakeLister{}, &fakeGetter{}, &fakeFullTextFetcher{},
-		&fakeSummarizer{})
+	mux := newTestMux(muxDeps{})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

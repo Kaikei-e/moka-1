@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
@@ -18,6 +19,35 @@ type FeedRegistrar interface {
 // FeedLister は登録済みフィード一覧の消費側ポート(具象は *store.Store、main で注入)。
 type FeedLister interface {
 	ListFeeds(ctx context.Context) ([]feed.Feed, error)
+}
+
+// FeedDeleter は購読解除の消費側ポート(具象は *store.Store、main で注入)。
+// 戻り値は「行を実際に消したか」(false = 元から無い → 404)。
+type FeedDeleter interface {
+	DeleteFeed(ctx context.Context, id int64) (bool, error)
+}
+
+// handleDeleteFeed は DELETE /api/v1/feeds/{id}。フィード行のハード削除で、配下の
+// 記事・取得履歴・要約・既読は FK の ON DELETE CASCADE がまとめて消す。成功は 204。
+func handleDeleteFeed(feeds FeedDeleter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid feed id")
+			return
+		}
+
+		deleted, err := feeds.DeleteFeed(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if !deleted {
+			writeError(w, http.StatusNotFound, "feed not found")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 // handleListFeeds は GET /api/v1/feeds。新しい順(created_at DESC)。

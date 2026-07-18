@@ -62,7 +62,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           httpapi.NewMux(registrar, st, st, st, fullTexts, summarizer),
+		Handler:           httpapi.NewMux(registrar, st, st, st, st, st, fullTexts, summarizer),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,

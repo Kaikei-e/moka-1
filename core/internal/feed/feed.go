@@ -33,15 +33,19 @@ type Item struct {
 }
 
 // Article は保存済み記事(articles 行)。store→httpapi を1型で貫く(guardrail #4)。
+// FeedTitle / Read は articles 行そのものではなく、一覧・読書ビュー用に store が
+// JOIN / EXISTS で導出する読み取り専用の付加情報。
 type Article struct {
 	ID          int64      `json:"id"`
 	FeedID      int64      `json:"feed_id"`
+	FeedTitle   *string    `json:"feed_title"` // feeds.title(title 未設定のフィードは null)
 	GUID        string     `json:"guid"`
 	URL         string     `json:"url"`
 	Title       string     `json:"title"`
 	Content     string     `json:"content"`
 	PublishedAt *time.Time `json:"published_at"`
 	CreatedAt   time.Time  `json:"created_at"`
+	Read        bool       `json:"read"` // article_reads に行がある = 既読(未読 = 行が無い)
 }
 
 // Conditional は条件付き GET の状態(最新 feed_fetches 行から導出)。
