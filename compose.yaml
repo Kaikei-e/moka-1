@@ -149,7 +149,10 @@ services:
     restart: unless-stopped
     environment:
       MOKA_CORE_URL: http://moka-core:8080 # moka-core へはサーバー側から(bp-svelte §11)
-      ORIGIN: https://localhost # エッジ(Plecto)経由の form actions の origin 検査用
+      # form actions の origin 検査用(SvelteKit の CSRF 保護)。既定 https://localhost。
+      # 実ドメイン公開時は .env(gitignore 済み)で上書き必須 — ここにドメインを書かない。
+      # 未上書きだと本番ドメインからの POST が全部 403(Cross-site POST forbidden)になる
+      ORIGIN: ${ORIGIN:-https://localhost}
     depends_on:
       moka-core:
         condition: service_healthy
