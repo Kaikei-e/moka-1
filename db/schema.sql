@@ -10,6 +10,7 @@
 --   - 訂正・再生成は新しい行の追記(最新 = created_at 降順の先頭)
 
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============ リソース ============
 
@@ -39,6 +40,21 @@ CREATE TABLE articles (
 -- 完全一致させる。published_at が無い記事(フィードに pubDate が無い)は取得できた時刻
 -- (created_at)を代替の並びキーとする(取得できた新しい記事が最下部に沈み続けない)
 CREATE INDEX articles_sort_key_idx ON articles ((COALESCE(published_at, created_at)) DESC, id DESC);
+
+-- ハイブリッド検索のテキスト側(pg_trgm — ADR00022)。similarity / % 演算子が使う
+CREATE INDEX articles_title_trgm_idx ON articles USING gin (title gin_trgm_ops);
+CREATE INDEX articles_content_trgm_idx ON articles USING gin (content gin_trgm_ops);
+
+-- パスキー資格情報(WebAuthn — ADR00021)。単一ユーザー前提で通常1行。
+-- 登録はパスキーが1本も無いときだけ開放(OSS クローン後のブートストラップ)。
+-- sign counter はここに持たない — auth_assertions(イベント)の最新行から導出する
+CREATE TABLE passkey_credentials (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    credential_id BYTEA NOT NULL UNIQUE,
+    public_key    BYTEA NOT NULL,
+    meta          JSONB, -- transports / flags / aaguid 等、検証ライブラリが要求する付帯情報
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- タグ(正規化)。LLM 抽出結果の語彙
 CREATE TABLE tags (
@@ -160,3 +176,13 @@ CREATE TABLE qa_answers (
 );
 
 CREATE INDEX qa_answers_question_idx ON qa_answers (question_id);
+
+-- ログイン(WebAuthn assertion)の事実。sign counter の最新値はここから導出(ADR00021)
+CREATE TABLE auth_assertions (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    credential_id BIGINT NOT NULL REFERENCES passkey_credentials (id) ON DELETE CASCADE,
+    sign_count    BIGINT NOT NULL,
+    asserted_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX auth_assertions_latest_idx ON auth_assertions (credential_id, asserted_at DESC);
