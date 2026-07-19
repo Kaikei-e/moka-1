@@ -23,11 +23,13 @@ var (
 	ErrEmptyCompletion = errors.New("empty completion after think-strip")
 )
 
-// maxInputTokens はモデル呼び出し前のクライアント側ガード。実効コンテキスト 8192 トークンから
-// システムプロンプト・max_tokens(1536)分を差し引いた入力予算。
+// maxInputTokens はモデル呼び出し前のクライアント側ガード。実効コンテキスト 16384 トークン
+// (llm/models-preset.ini の qwen3.5-4b、2026-07-19 に 8192 から拡張 — 全文取り寄せ後
+// 4000〜9000文字級の日本語記事が旧予算を超えて ErrArticleTooLong になる実運用事例のため)
+// からシステムプロンプト・max_tokens(1536)分を差し引いた入力予算。
 // 正確なトークナイザは導入せず、estimateTokens の保守的(過大)見積りと比較して、
 // 超過は ErrArticleTooLong で明示エラーにする(黙ってトランケートしない)。
-const maxInputTokens = 6000
+const maxInputTokens = 14000
 
 // estimateTokens は入力テキストのトークン数を保守的(実際より多め)に見積もる:
 // ASCII は 4 文字 ≒ 1 トークン、それ以外(日本語等のマルチバイト文字)は 1 文字 ≒ 2 トークン。

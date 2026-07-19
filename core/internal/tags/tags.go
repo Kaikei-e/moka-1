@@ -29,10 +29,11 @@ var (
 )
 
 // maxInputTokens はモデル呼び出し前のクライアント側ガード。summarize と同じ実効コンテキスト
-// 8192 トークンから、システムプロンプトとタグ抽出の max_tokens(256、要約よりずっと短い)分を
-// 差し引いた入力予算。正確なトークナイザは導入せず、estimateTokens の保守的(過大)見積りと
+// 16384 トークン(2026-07-19 に 8192 から拡張、summarize.go 参照)から、システムプロンプトと
+// タグ抽出の max_tokens(256、要約よりずっと短い)分を差し引いた入力予算。
+// 正確なトークナイザは導入せず、estimateTokens の保守的(過大)見積りと
 // 比較して、超過は ErrArticleTooLong で明示エラーにする(黙ってトランケートしない)。
-const maxInputTokens = 7000
+const maxInputTokens = 15000
 
 // estimateTokens は入力テキストのトークン数を保守的(実際より多め)に見積もる。
 // summarize.estimateTokens と同じ考え方(ASCII 4文字≒1トークン、他は1文字≒2トークン)。
