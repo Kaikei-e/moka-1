@@ -15,7 +15,13 @@ import (
 //     「backoff = 直近の失敗回数から導出」に対応する簡易実装)。
 //
 // 一時的失敗(LLM 不調等)は除外しない — 毎 tick 素直に再試行される。
+//
+// kind = 'embedding' だけは導出規則が異なる(成果の不在ではなく最新 fulltext との鮮度
+// 比較 — 全文を取り寄せたら埋め込みも作り直す)ため pendingEmbeddings に分岐する。
 func (s *Store) PendingForKind(ctx context.Context, kind string, limit int) ([]int64, error) {
+	if kind == "embedding" {
+		return s.pendingEmbeddings(ctx, limit)
+	}
 	rows, err := s.pool.Query(ctx,
 		`SELECT a.id FROM articles a
 		 WHERE NOT EXISTS (

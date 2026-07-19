@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
+	"github.com/Kaikei-e/moka-1/core/internal/rag"
 	"github.com/Kaikei-e/moka-1/core/internal/summarize"
 	"github.com/Kaikei-e/moka-1/core/internal/tags"
 )
@@ -21,10 +22,13 @@ const defaultTick = 15 * time.Second
 // defaultBatchSize は 1 tick・1 kind あたりに処理する記事数の上限。
 const defaultBatchSize = 20
 
-// summaryKind / tagsKind は enrichment_attempts.kind の値(db/schema.sql の CHECK 制約)。
+// summaryKind / tagsKind / embeddingKind は enrichment_attempts.kind の値
+// (db/schema.sql の CHECK 制約)。embedding の pending 導出だけは attempts でなく
+// 成果(article_embeddings)と最新 fulltext の鮮度比較から導く(store.PendingForKind)。
 const (
-	summaryKind = "summary"
-	tagsKind    = "tags"
+	summaryKind   = "summary"
+	tagsKind      = "tags"
+	embeddingKind = "embedding"
 )
 
 // ArticleGetter は記事本文の参照ポート(具象は *store.Store)。
@@ -47,6 +51,11 @@ type Tagger interface {
 	Tag(ctx context.Context, articleID int64, articleContent string) (tags.Result, error)
 }
 
+// Embedder は埋め込みユースケースの消費側ポート(具象は *rag.EmbedService)。
+type Embedder interface {
+	EmbedArticle(ctx context.Context, articleID int64, title, articleContent string) error
+}
+
 // Scheduler は常駐エージェントループの step3(tenets §3.2)を担う単一 goroutine の
 // ティッカーループ。feed.Scheduler とは独立したティッカーを持つ(取得とは別のペースで回す)。
 type Scheduler struct {
@@ -54,6 +63,7 @@ type Scheduler struct {
 	pending   PendingLister
 	summarize Summarizer
 	tag       Tagger
+	embed     Embedder
 	tick      time.Duration
 	batchSize int
 	log       *slog.Logger
@@ -62,7 +72,7 @@ type Scheduler struct {
 // NewScheduler はスケジューラを組む。tick が 0 以下なら既定値(15秒)を使う。
 func NewScheduler(
 	articles ArticleGetter, pending PendingLister, summarizer Summarizer, tagger Tagger,
-	tick time.Duration, log *slog.Logger,
+	embedder Embedder, tick time.Duration, log *slog.Logger,
 ) *Scheduler {
 	if tick <= 0 {
 		tick = defaultTick
@@ -75,6 +85,7 @@ func NewScheduler(
 		pending:   pending,
 		summarize: summarizer,
 		tag:       tagger,
+		embed:     embedder,
 		tick:      tick,
 		batchSize: defaultBatchSize,
 		log:       log,
@@ -97,20 +108,23 @@ func (s *Scheduler) Run(ctx context.Context) {
 	}
 }
 
-// tickOnce は種類単位(全pending summary → 全pending tags)で1周ぶん濃縮する。
-// summary 側で LLM 不調を検知したら tags 側は試さずこの tick を打ち切る
+// tickOnce は種類単位(全pending summary → 全pending tags → 全pending embedding)で
+// 1周ぶん濃縮する。先行の種類で LLM 不調を検知したら残りの種類は試さずこの tick を打ち切る
 // (tenets §3.2 step5 バックプレッシャ。状態はメモリ上のみ、次 tick でリセットされる)。
 func (s *Scheduler) tickOnce(ctx context.Context) {
 	if !s.runKind(ctx, summaryKind, s.summarizeOne) {
 		return
 	}
-	s.runKind(ctx, tagsKind, s.tagOne)
+	if !s.runKind(ctx, tagsKind, s.tagOne) {
+		return
+	}
+	s.runKind(ctx, embeddingKind, s.embedOne)
 }
 
 // runKind は1種類分の pending 記事を処理する。false を返すのは「LLM 不調によりこの tick の
 // 残りを打ち切るべき」の合図(ctx cancel も同様に扱う)。
 func (s *Scheduler) runKind(
-	ctx context.Context, kind string, process func(ctx context.Context, articleID int64, content string) error,
+	ctx context.Context, kind string, process func(ctx context.Context, a feed.Article) error,
 ) bool {
 	ids, err := s.pending.PendingForKind(ctx, kind, s.batchSize)
 	if err != nil {
@@ -132,7 +146,7 @@ func (s *Scheduler) runKind(
 			continue
 		}
 
-		if err := process(ctx, id, a.Content); err != nil {
+		if err := process(ctx, a); err != nil {
 			if isLLMUnavailable(err) {
 				s.log.Warn("llm unavailable, skipping rest of tick", "kind", kind, "article_id", id)
 				return false
@@ -144,17 +158,23 @@ func (s *Scheduler) runKind(
 	return true
 }
 
-func (s *Scheduler) summarizeOne(ctx context.Context, articleID int64, content string) error {
-	_, err := s.summarize.Summarize(ctx, articleID, content, false)
+func (s *Scheduler) summarizeOne(ctx context.Context, a feed.Article) error {
+	_, err := s.summarize.Summarize(ctx, a.ID, a.Content, false)
 	return err
 }
 
-func (s *Scheduler) tagOne(ctx context.Context, articleID int64, content string) error {
-	_, err := s.tag.Tag(ctx, articleID, content)
+func (s *Scheduler) tagOne(ctx context.Context, a feed.Article) error {
+	_, err := s.tag.Tag(ctx, a.ID, a.Content)
 	return err
 }
 
-// isLLMUnavailable は summarize/tags いずれの「LLM 不調」sentinel も検知する。
+func (s *Scheduler) embedOne(ctx context.Context, a feed.Article) error {
+	return s.embed.EmbedArticle(ctx, a.ID, a.Title, a.Content)
+}
+
+// isLLMUnavailable は summarize/tags/rag いずれの「LLM 不調」sentinel も検知する。
 func isLLMUnavailable(err error) bool {
-	return errors.Is(err, summarize.ErrLLMUnavailable) || errors.Is(err, tags.ErrLLMUnavailable)
+	return errors.Is(err, summarize.ErrLLMUnavailable) ||
+		errors.Is(err, tags.ErrLLMUnavailable) ||
+		errors.Is(err, rag.ErrLLMUnavailable)
 }

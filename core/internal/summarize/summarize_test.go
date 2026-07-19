@@ -1,5 +1,8 @@
 package summarize
 
+// thinkStreamStripper のテストは llm.ThinkStreamStripper への移設(rag との共用化)に伴い
+// internal/llm/thinkstream_test.go へ移動した。
+
 import (
 	"strings"
 	"testing"
@@ -7,103 +10,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// feedAll は複数チャンクを thinkStreamStripper に順に流し込み、都度の出力を連結する。
-func feedAll(s *thinkStreamStripper, chunks ...string) string {
-	var out strings.Builder
-	for _, c := range chunks {
-		out.WriteString(s.feed(c))
-	}
-	return out.String()
-}
-
-func TestThinkStreamStripper(t *testing.T) {
+func TestEstimateTokens(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no think tag: passes chunks straight through once undecided buffer resolves", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "記事の", "要約です。")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Equal(t, "記事の要約です。", got)
-		assert.True(t, closed)
-	})
-
-	t.Run("very short output shorter than the open tag flushes on finish", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "短い")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Equal(t, "短い", got)
-		assert.True(t, closed)
-	})
-
-	t.Run("closed think tag split across chunks: nothing leaks before close", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "<thi", "nk>推論", "過程</th", "ink>本文", "の続き")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Equal(t, "本文の続き", got)
-		assert.True(t, closed)
-	})
-
-	t.Run("unclosed think tag: nothing is ever flushed and closed is false", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "<think>", "途中で切れた推論")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Empty(t, got)
-		assert.False(t, closed)
-	})
-
-	t.Run("leading newline before think tag: CoT still never leaks", func(t *testing.T) {
-		t.Parallel()
-
-		// "\n<think>" で始まる応答(Qwen で頻出)。prefix 判定が先頭空白を許容しないと
-		// passthrough に落ちて推論過程が丸ごとクライアントへ漏れる
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "\n<th", "ink>これは推論過程", "</think>", "本文の要約")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Equal(t, "本文の要約", got)
-		assert.True(t, closed)
-	})
-
-	t.Run("whitespace-only first chunk stays buffered until decidable", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		got := feedAll(s, "\n", " ", "<think>推論</think>要約")
-		flush, closed := s.finish()
-		got += flush
-
-		assert.Equal(t, "要約", got)
-		assert.True(t, closed)
-	})
-
-	t.Run("after passthrough begins, subsequent chunks stream immediately", func(t *testing.T) {
-		t.Parallel()
-
-		s := &thinkStreamStripper{}
-		first := feedAll(s, "本文冒頭これは十分に長い")
-		second := s.feed("続き")
-		flush, closed := s.finish()
-
-		assert.Equal(t, "本文冒頭これは十分に長い", first)
-		assert.Equal(t, "続き", second)
-		assert.Empty(t, flush)
-		assert.True(t, closed)
-	})
+	tests := []struct {
+		name string
+		text string
+		want int
+	}{
+		{"empty", "", 0},
+		{"ascii is 4 chars per token", strings.Repeat("a", 40), 10},
+		{"japanese is 2 tokens per char (byte count ではなく rune count)", "日本語テスト", 12},
+		{"mixed ascii and japanese", "abcd日本", 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, estimateTokens(tt.text))
+		})
+	}
 }

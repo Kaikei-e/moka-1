@@ -6,11 +6,9 @@ package summarize
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
-	"github.com/Kaikei-e/moka-1/core/internal/llm"
 )
 
 // ドメイン境界の sentinel。httpapi がステータスコードへ写像する。
@@ -89,83 +87,6 @@ type Completer interface {
 	CompleteStream(ctx context.Context, text string, onRawDelta func(delta string)) (CompletionResult, error)
 }
 
-// think タグの開閉境界(llm.OpenTag/llm.CloseTag/llm.ThinkLeadingSpace)は
-// llm.StripThink と thinkStreamStripper の両方が参照する共通の単一ソース。
-
-// thinkStreamStripState は thinkStreamStripper の内部フェーズ。
-type thinkStreamStripState int
-
-const (
-	thinkStreamUndecided thinkStreamStripState = iota
-	thinkStreamInsideThink
-	thinkStreamPassthrough
-)
-
-// thinkStreamStripper は stripThink のストリーミング版: チャンク到着のたびに
-// 「<think> ブロックの外側」だけを即座に返す。<think> が閉じるかどうか判明するまで
-// 何もクライアントへ流さない(ADR00014 §5 の防御的除去をチャンク単位に適用したもの)。
-// 最終的な保存判定は常に stripThink(完全な生テキスト) を単一の正とし、これは
-// リアルタイム表示専用の補助ロジック。
-type thinkStreamStripper struct {
-	state   thinkStreamStripState
-	pending strings.Builder
-}
-
-// feed は生チャンクを1つ処理し、今すぐクライアントへ流してよい文字列を返す。
-func (s *thinkStreamStripper) feed(chunk string) string {
-	switch s.state {
-	case thinkStreamPassthrough:
-		return chunk
-	case thinkStreamInsideThink:
-		s.pending.WriteString(chunk)
-		buffered := s.pending.String()
-		_, after, ok := strings.Cut(buffered, llm.CloseTag)
-		if !ok {
-			return ""
-		}
-		s.pending.Reset()
-		s.state = thinkStreamPassthrough
-		return after
-	default: // thinkStreamUndecided
-		s.pending.WriteString(chunk)
-		buffered := s.pending.String()
-		// stripThink と同じ判定: 先頭空白は許容した上で、冒頭が <think> の時だけ think モード。
-		// 先頭空白をスキップしないと "\n<think>" で passthrough に落ち、CoT が丸ごと漏れる。
-		trimmed := strings.TrimLeft(buffered, llm.ThinkLeadingSpace)
-		if len(trimmed) < len(llm.OpenTag) {
-			if strings.HasPrefix(llm.OpenTag, trimmed) {
-				return "" // まだ <think> かどうか確定しない — 保留
-			}
-			s.pending.Reset()
-			s.state = thinkStreamPassthrough
-			return buffered
-		}
-		if !strings.HasPrefix(trimmed, llm.OpenTag) {
-			s.pending.Reset()
-			s.state = thinkStreamPassthrough
-			return buffered
-		}
-		rest := trimmed[len(llm.OpenTag):]
-		s.pending.Reset()
-		s.state = thinkStreamInsideThink
-		_, after, ok := strings.Cut(rest, llm.CloseTag)
-		if !ok {
-			s.pending.WriteString(rest)
-			return ""
-		}
-		s.state = thinkStreamPassthrough
-		return after
-	}
-}
-
-// finish は完全な応答終端(finish_reason=stop相当)で呼ぶ。未決着のまま残った
-// バッファは <think> の開始タグ長にすら満たない = think タグではあり得ないので
-// 素直な本文として flush する。closed=false は think タグが閉じずに終わった場合。
-func (s *thinkStreamStripper) finish() (flush string, closed bool) {
-	if s.state == thinkStreamUndecided && s.pending.Len() > 0 {
-		flush = s.pending.String()
-		s.pending.Reset()
-		s.state = thinkStreamPassthrough
-	}
-	return flush, s.state != thinkStreamInsideThink
-}
+// ストリーミング中の think 除去は llm.ThinkStreamStripper(rag の Q&A と共用)。
+// think タグの開閉境界(llm.OpenTag/llm.CloseTag/llm.ThinkLeadingSpace)とともに
+// internal/llm に一元化されている(bp-go)。

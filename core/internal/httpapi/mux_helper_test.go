@@ -17,6 +17,9 @@ type muxDeps struct {
 	summaryReader SummaryReader
 	tagger        ArticleTagger
 	tagsReader    TagsReader
+	searcher      ArticleSearcher
+	answerer      ArticleAnswerer
+	auth          Authenticator
 }
 
 // newTestMux は未指定ポートをデフォルトのフェイクで補って NewMux を組み立てる。
@@ -54,8 +57,18 @@ func newTestMux(d muxDeps) *http.ServeMux {
 	if d.tagsReader == nil {
 		d.tagsReader = &fakeTagsReader{}
 	}
+	if d.searcher == nil {
+		d.searcher = &fakeSearcher{}
+	}
+	if d.answerer == nil {
+		d.answerer = &fakeAnswerer{}
+	}
+	if d.auth == nil {
+		d.auth = &fakeAuthenticator{}
+	}
 	return NewMux(
 		d.feeds, d.feedList, d.feedDelete, d.articles, d.article, d.reads, d.fullTexts,
-		d.summarizer, d.summaryReader, d.tagger, d.tagsReader,
+		d.summarizer, d.summaryReader, d.tagger, d.tagsReader, d.searcher, d.answerer,
+		d.auth,
 	)
 }

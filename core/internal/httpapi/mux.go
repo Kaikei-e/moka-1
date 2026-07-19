@@ -22,6 +22,9 @@ func NewMux(
 	summaryReader SummaryReader,
 	tagger ArticleTagger,
 	tagsReader TagsReader,
+	searcher ArticleSearcher,
+	answerer ArticleAnswerer,
+	authn Authenticator,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
@@ -37,6 +40,13 @@ func NewMux(
 	mux.HandleFunc("POST /api/v1/articles/{id}/summary/stream", handleSummarizeArticleStream(article, summarizer))
 	mux.HandleFunc("GET /api/v1/articles/{id}/tags", handleGetTags(article, tagsReader))
 	mux.HandleFunc("POST /api/v1/articles/{id}/tags", handleTagArticle(article, tagger))
+	mux.HandleFunc("GET /api/v1/search", handleSearch(searcher))
+	mux.HandleFunc("POST /api/v1/articles/{id}/qa", handleAskArticle(article, answerer))
+	mux.HandleFunc("GET /api/v1/auth/status", handleAuthStatus(authn))
+	mux.HandleFunc("POST /api/v1/auth/register/begin", handleRegisterBegin(authn))
+	mux.HandleFunc("POST /api/v1/auth/register/finish", handleRegisterFinish(authn))
+	mux.HandleFunc("POST /api/v1/auth/login/begin", handleLoginBegin(authn))
+	mux.HandleFunc("POST /api/v1/auth/login/finish", handleLoginFinish(authn))
 	// メソッド無しパターンはメソッド不一致時の受け皿(無いと /api/ スタブが 501 で拾ってしまう)
 	mux.HandleFunc("/api/v1/feeds", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/feeds/{id}", handleMethodNotAllowed)
@@ -47,6 +57,13 @@ func NewMux(
 	mux.HandleFunc("/api/v1/articles/{id}/summary", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/summary/stream", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/tags", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/search", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/articles/{id}/qa", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/status", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/register/begin", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/register/finish", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/login/begin", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/login/finish", handleMethodNotAllowed)
 	mux.HandleFunc("/api/", handleAPIStub)
 	return mux
 }

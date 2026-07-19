@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
+	"github.com/Kaikei-e/moka-1/core/internal/rag"
 	"github.com/Kaikei-e/moka-1/core/internal/summarize"
 	"github.com/Kaikei-e/moka-1/core/internal/tags"
 )
@@ -70,6 +71,27 @@ func (f *fakeTagger) Tag(_ context.Context, articleID int64, _ string) (tags.Res
 	return tags.Result{Created: true}, nil
 }
 
+// fakeEmbedder は Embedder ポートのフェイク。呼び出し順と入力を記録する。
+type fakeEmbedder struct {
+	calledIDs []int64
+	gotTitle  map[int64]string
+	gotBody   map[int64]string
+	errFor    map[int64]error
+}
+
+func (f *fakeEmbedder) EmbedArticle(_ context.Context, articleID int64, title, articleContent string) error {
+	f.calledIDs = append(f.calledIDs, articleID)
+	if f.gotTitle == nil {
+		f.gotTitle = map[int64]string{}
+		f.gotBody = map[int64]string{}
+	}
+	f.gotTitle[articleID], f.gotBody[articleID] = title, articleContent
+	if err := f.errFor[articleID]; err != nil {
+		return err
+	}
+	return nil
+}
+
 func discardLogger() *slog.Logger {
 	return slog.New(slog.DiscardHandler)
 }
@@ -85,23 +107,59 @@ func articleSet(ids ...int64) map[int64]feed.Article {
 func TestSchedulerTickOnce(t *testing.T) {
 	t.Parallel()
 
-	t.Run("kind-unit ordering: all pending summaries run before any pending tags", func(t *testing.T) {
+	t.Run("kind-unit ordering: summaries, then tags, then embeddings", func(t *testing.T) {
 		t.Parallel()
 
 		synctest.Test(t, func(t *testing.T) {
 			pending := &fakePendingLister{byKind: map[string][]int64{
-				summaryKind: {1, 2},
-				tagsKind:    {3, 4},
+				summaryKind:   {1, 2},
+				tagsKind:      {3, 4},
+				embeddingKind: {5, 6},
 			}}
-			articles := &fakeArticleGetter{articles: articleSet(1, 2, 3, 4)}
+			articles := &fakeArticleGetter{articles: articleSet(1, 2, 3, 4, 5, 6)}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
 			assert.Equal(t, []int64{1, 2}, summarizer.calledIDs)
 			assert.Equal(t, []int64{3, 4}, tagger.calledIDs)
+			assert.Equal(t, []int64{5, 6}, embedder.calledIDs)
+		})
+	})
+
+	t.Run("embedder receives the article title and feed content", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			pending := &fakePendingLister{byKind: map[string][]int64{embeddingKind: {1}}}
+			articles := &fakeArticleGetter{articles: map[int64]feed.Article{
+				1: {ID: 1, Title: "タイトル", Content: "本文"},
+			}}
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, &fakeSummarizer{}, &fakeTagger{}, embedder, time.Hour, discardLogger())
+
+			s.tickOnce(t.Context())
+
+			assert.Equal(t, "タイトル", embedder.gotTitle[1])
+			assert.Equal(t, "本文", embedder.gotBody[1])
+		})
+	})
+
+	t.Run("llm unavailable during embedding pass aborts the rest of that pass", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			pending := &fakePendingLister{byKind: map[string][]int64{embeddingKind: {1, 2}}}
+			articles := &fakeArticleGetter{articles: articleSet(1, 2)}
+			embedder := &fakeEmbedder{errFor: map[int64]error{1: rag.ErrLLMUnavailable}}
+			s := NewScheduler(articles, pending, &fakeSummarizer{}, &fakeTagger{}, embedder, time.Hour, discardLogger())
+
+			s.tickOnce(t.Context())
+
+			assert.Equal(t, []int64{1}, embedder.calledIDs, "rag.ErrLLMUnavailable もバックプレッシャとして検知する")
 		})
 	})
 
@@ -116,12 +174,14 @@ func TestSchedulerTickOnce(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(1, 2, 3)}
 			summarizer := &fakeSummarizer{errFor: map[int64]error{1: summarize.ErrLLMUnavailable}}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
 			assert.Equal(t, []int64{1}, summarizer.calledIDs, "llm不調を検知した記事以降は同kind内も打ち切る")
 			assert.Empty(t, tagger.calledIDs, "次kind(tags)は今回のtickでは一切試さない")
+			assert.Empty(t, embedder.calledIDs, "embedding も今回のtickでは一切試さない")
 		})
 	})
 
@@ -136,12 +196,14 @@ func TestSchedulerTickOnce(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(1, 2, 3)}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{errFor: map[int64]error{2: tags.ErrLLMUnavailable}}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
 			assert.Equal(t, []int64{1}, summarizer.calledIDs)
 			assert.Equal(t, []int64{2}, tagger.calledIDs, "tags側で不調を検知したらそこで打ち切る")
+			assert.Empty(t, embedder.calledIDs, "embedding は今回のtickでは一切試さない")
 		})
 	})
 
@@ -155,7 +217,8 @@ func TestSchedulerTickOnce(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(1, 2, 3)}
 			summarizer := &fakeSummarizer{errFor: map[int64]error{2: errors.New("too long")}}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
@@ -174,7 +237,8 @@ func TestSchedulerTickOnce(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(3)}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
@@ -194,7 +258,8 @@ func TestSchedulerTickOnce(t *testing.T) {
 			}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			s.tickOnce(t.Context())
 
@@ -210,7 +275,8 @@ func TestSchedulerTickOnce(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(1, 2)}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, time.Hour, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, time.Hour, discardLogger())
 
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
@@ -224,10 +290,10 @@ func TestSchedulerTickOnce(t *testing.T) {
 func TestNewSchedulerDefaultsNonPositiveTick(t *testing.T) {
 	t.Parallel()
 
-	s := NewScheduler(&fakeArticleGetter{}, &fakePendingLister{}, &fakeSummarizer{}, &fakeTagger{}, 0, discardLogger())
+	s := NewScheduler(&fakeArticleGetter{}, &fakePendingLister{}, &fakeSummarizer{}, &fakeTagger{}, &fakeEmbedder{}, 0, discardLogger())
 	assert.Equal(t, defaultTick, s.tick)
 
-	s = NewScheduler(&fakeArticleGetter{}, &fakePendingLister{}, &fakeSummarizer{}, &fakeTagger{}, -time.Second, discardLogger())
+	s = NewScheduler(&fakeArticleGetter{}, &fakePendingLister{}, &fakeSummarizer{}, &fakeTagger{}, &fakeEmbedder{}, -time.Second, discardLogger())
 	assert.Equal(t, defaultTick, s.tick)
 }
 
@@ -242,7 +308,8 @@ func TestSchedulerRun(t *testing.T) {
 			articles := &fakeArticleGetter{articles: articleSet(1)}
 			summarizer := &fakeSummarizer{}
 			tagger := &fakeTagger{}
-			s := NewScheduler(articles, pending, summarizer, tagger, 10*time.Second, discardLogger())
+			embedder := &fakeEmbedder{}
+			s := NewScheduler(articles, pending, summarizer, tagger, embedder, 10*time.Second, discardLogger())
 
 			ctx, cancel := context.WithCancel(t.Context())
 			done := make(chan struct{})

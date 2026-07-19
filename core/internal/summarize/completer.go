@@ -30,15 +30,18 @@ const (
 // プロンプト・サンプリングパラメータ・モデル系譜メタの組み立てだけを持つ。
 type LLMCompleter struct {
 	client *llm.Client
+	model  string
 }
 
-// NewLLMCompleter はアダプタを組む。
-func NewLLMCompleter(client *llm.Client) *LLMCompleter {
-	return &LLMCompleter{client: client}
+// NewLLMCompleter はアダプタを組む。model は router mode(ADR00020)のルーティングキー
+// (高速パスの別名 — main が環境変数から注入する)。
+func NewLLMCompleter(client *llm.Client, model string) *LLMCompleter {
+	return &LLMCompleter{client: client, model: model}
 }
 
 func (c *LLMCompleter) request(text string) llm.ChatRequest {
 	return llm.ChatRequest{
+		Model:              c.model,
 		System:             systemPrompt,
 		Text:               text,
 		Temperature:        temperature,

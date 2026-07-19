@@ -66,6 +66,74 @@ func TestClientComplete(t *testing.T) {
 		assert.Equal(t, "記事本文", user["content"])
 	})
 
+	t.Run("Model set is sent as the model field (router mode routing — ADR00020)", func(t *testing.T) {
+		t.Parallel()
+
+		var gotBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"model":   "qwen3.5-4b",
+				"choices": []map[string]any{{"message": map[string]any{"content": "結果"}}},
+			})
+		}))
+		defer srv.Close()
+
+		req := testReq("text")
+		req.Model = "qwen3.5-4b"
+
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), req)
+		require.NoError(t, err)
+		assert.Equal(t, "qwen3.5-4b", gotBody["model"])
+	})
+
+	t.Run("empty Model omits the model field entirely", func(t *testing.T) {
+		t.Parallel()
+
+		var gotBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"model":   "m",
+				"choices": []map[string]any{{"message": map[string]any{"content": "結果"}}},
+			})
+		}))
+		defer srv.Close()
+
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), testReq("text"))
+		require.NoError(t, err)
+		_, hasModel := gotBody["model"]
+		assert.False(t, hasModel)
+	})
+
+	t.Run("nil ChatTemplateKwargs omits the field (gpt-oss 系テンプレートに余計なkwargを渡さない)", func(t *testing.T) {
+		t.Parallel()
+
+		var gotBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"model":   "m",
+				"choices": []map[string]any{{"message": map[string]any{"content": "結果"}}},
+			})
+		}))
+		defer srv.Close()
+
+		req := testReq("text")
+		req.ChatTemplateKwargs = nil
+
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), req)
+		require.NoError(t, err)
+		_, hasKwargs := gotBody["chat_template_kwargs"]
+		assert.False(t, hasKwargs)
+	})
+
 	t.Run("Schema set sends response_format json_schema", func(t *testing.T) {
 		t.Parallel()
 

@@ -47,12 +47,15 @@ type jsonSchemaBody struct {
 }
 
 type chatBody struct {
+	// Model は router mode(ADR00020)のルーティングキー(モデル別名)。空なら省略 —
+	// 単一モデル構成のサーバーはフィールド無しでもそのまま動く。
+	Model              string          `json:"model,omitempty"`
 	Messages           []chatMessage   `json:"messages"`
 	Temperature        float64         `json:"temperature"`
 	TopP               float64         `json:"top_p"`
 	TopK               int             `json:"top_k"`
 	MaxTokens          int             `json:"max_tokens"`
-	ChatTemplateKwargs map[string]any  `json:"chat_template_kwargs"`
+	ChatTemplateKwargs map[string]any  `json:"chat_template_kwargs,omitempty"`
 	Stream             bool            `json:"stream,omitempty"`
 	ResponseFormat     *responseFormat `json:"response_format,omitempty"`
 }
@@ -77,6 +80,7 @@ type chatStreamChunk struct {
 // buildBody は Complete/CompleteStream 共通のリクエスト本体を組む。
 func buildBody(req ChatRequest, stream bool) chatBody {
 	body := chatBody{
+		Model: req.Model,
 		Messages: []chatMessage{
 			{Role: "system", Content: req.System},
 			{Role: "user", Content: req.Text},
@@ -103,13 +107,13 @@ func buildBody(req ChatRequest, stream bool) chatBody {
 
 // doRequest はリクエストを組んで送信し、2xx を確認した *http.Response を返す。
 // 呼び出し元が resp.Body を閉じる責務を持つ。
-func (c *Client) doRequest(ctx context.Context, body chatBody) (*http.Response, error) {
+func (c *Client) doRequest(ctx context.Context, path string, body any) (*http.Response, error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w (%w)", ErrUnavailable, err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w (%w)", ErrUnavailable, err)
 	}
@@ -132,7 +136,7 @@ func (c *Client) Complete(ctx context.Context, req ChatRequest) (Result, error) 
 	ctx, cancel := context.WithTimeout(ctx, completeTimeout)
 	defer cancel()
 
-	resp, err := c.doRequest(ctx, buildBody(req, false))
+	resp, err := c.doRequest(ctx, "/chat/completions", buildBody(req, false))
 	if err != nil {
 		return Result{}, err
 	}
@@ -160,7 +164,7 @@ func (c *Client) CompleteStream(
 	ctx, cancel := context.WithTimeout(ctx, completeTimeout)
 	defer cancel()
 
-	resp, err := c.doRequest(ctx, buildBody(req, true))
+	resp, err := c.doRequest(ctx, "/chat/completions", buildBody(req, true))
 	if err != nil {
 		return Result{}, err
 	}

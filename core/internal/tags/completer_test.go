@@ -32,10 +32,11 @@ func TestLLMCompleterExtract(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewLLMCompleter(llm.NewClient(srv.URL, srv.Client()))
+		c := NewLLMCompleter(llm.NewClient(srv.URL, srv.Client()), "qwen3.5-4b")
 		res, err := c.Extract(t.Context(), "記事本文")
 		require.NoError(t, err)
 
+		assert.Equal(t, "qwen3.5-4b", gotBody["model"], "router mode のルーティングキー(ADR00020)")
 		assert.JSONEq(t, `{"tags":["タグ1","タグ2"]}`, res.Text)
 		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Meta["model"])
 		assert.InDelta(t, 0.7, res.Meta["temperature"], 0.0001)
@@ -62,7 +63,7 @@ func TestLLMCompleterExtract(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewLLMCompleter(llm.NewClient(srv.URL, srv.Client()))
+		c := NewLLMCompleter(llm.NewClient(srv.URL, srv.Client()), "qwen3.5-4b")
 		_, err := c.Extract(t.Context(), "text")
 		require.ErrorIs(t, err, llm.ErrUnavailable)
 	})

@@ -19,6 +19,8 @@ type Schema struct {
 
 // ChatRequest は 1 回のチャット補完に必要な全パラメータ(呼び出し元が組み立てる)。
 type ChatRequest struct {
+	// Model は router mode(ADR00020)のルーティングキー(モデル別名)。空なら送らない。
+	Model              string
 	System             string
 	Text               string
 	Temperature        float64

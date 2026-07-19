@@ -16,11 +16,13 @@ import (
 
 	"os/signal"
 
+	"github.com/Kaikei-e/moka-1/core/internal/auth"
 	"github.com/Kaikei-e/moka-1/core/internal/enrich"
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
 	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
 	"github.com/Kaikei-e/moka-1/core/internal/httpapi"
 	"github.com/Kaikei-e/moka-1/core/internal/llm"
+	"github.com/Kaikei-e/moka-1/core/internal/rag"
 	"github.com/Kaikei-e/moka-1/core/internal/store"
 	"github.com/Kaikei-e/moka-1/core/internal/summarize"
 	"github.com/Kaikei-e/moka-1/core/internal/tags"
@@ -60,15 +62,28 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	registrar := feed.NewRegistrar(st, feed.NewHTTPFetcher(validator), validator, logger)
 	fullTexts := fulltext.NewService(st, fulltext.NewHTTPFetcher(validator), fulltext.NewTrafilaturaExtractor(), validator)
 	llmClient := llm.NewClient(os.Getenv("LLM_BASE_URL"), &http.Client{Timeout: 90 * time.Second})
-	summarizer := summarize.NewService(st, st, summarize.NewLLMCompleter(llmClient), logger)
-	tagger := tags.NewService(st, st, tags.NewLLMCompleter(llmClient), logger)
+	models := llmModels()
+	summarizer := summarize.NewService(st, st, summarize.NewLLMCompleter(llmClient, models.Fast), logger)
+	tagger := tags.NewService(st, st, tags.NewLLMCompleter(llmClient, models.Fast), logger)
+	embedder := rag.NewLLMEmbedder(llmClient, models.Embedding)
+	searcher := rag.NewSearcher(st, st, embedder, logger)
+	embedService := rag.NewEmbedService(st, st, embedder, logger)
+	answerer := rag.NewAnswerer(st, st, searcher, rag.NewLLMAnswerCompleter(llmClient, models.Aggregate), logger)
+	// 認証(ADR00021)。鍵ファイルが無い場合は認証エンドポイントだけ 503 になり、
+	// 他の API は通常起動する(fail-soft — NewService は失敗しない)
+	authSvc := auth.NewService(auth.Config{
+		RPID:       os.Getenv("WEBAUTHN_RP_ID"),
+		Origin:     os.Getenv("WEBAUTHN_ORIGIN"),
+		SecretFile: os.Getenv("SESSION_HMAC_KEY_FILE"),
+	}, st, logger)
 	feedScheduler := feed.NewScheduler(st, registrar, schedulerTick(), logger)
-	enrichScheduler := enrich.NewScheduler(st, st, summarizer, tagger, enrichTick(), logger)
+	enrichScheduler := enrich.NewScheduler(st, st, summarizer, tagger, embedService, enrichTick(), logger)
 
 	server := &http.Server{
 		Addr: listenAddr,
 		Handler: httpapi.NewMux(
-			registrar, st, st, st, st, st, fullTexts, summarizer, st, tagger, st,
+			registrar, st, st, st, st, st, fullTexts, summarizer, st, tagger, st, searcher, answerer,
+			authSvc,
 		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -112,6 +127,24 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 	wg.Wait() // scheduler.Run の終了(ctx.Done 経由)を待ってから pool.Close() へ抜ける
 	return nil
+}
+
+// llmModels は router mode(ADR00020)の役割別モデル別名を環境変数から組む
+// (未設定は llm パッケージの既定値 — preset ファイルの宣言と一致させる)。
+func llmModels() llm.Models {
+	return llm.Models{
+		Fast:      envOr("LLM_MODEL_FAST", llm.DefaultFastModel),
+		Embedding: envOr("LLM_MODEL_EMBEDDING", llm.DefaultEmbeddingModel),
+		Aggregate: envOr("LLM_MODEL_AGGREGATE", llm.DefaultAggregateModel),
+	}
+}
+
+// envOr は環境変数 key の値、未設定・空なら def を返す。
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 // schedulerTick は due 判定のポーリング間隔(既定60秒、MOKA_SCHEDULER_TICK_SECONDS で上書き可能)。

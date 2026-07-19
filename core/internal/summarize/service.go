@@ -120,16 +120,16 @@ func (s *Service) SummarizeStream(
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("~%d tokens: %w", est, ErrArticleTooLong))
 	}
 
-	var stripper thinkStreamStripper
+	var stripper llm.ThinkStreamStripper
 	completion, err := s.complete.CompleteStream(ctx, text, func(rawDelta string) {
-		if chunk := stripper.feed(rawDelta); chunk != "" {
+		if chunk := stripper.Feed(rawDelta); chunk != "" {
 			onDelta(chunk)
 		}
 	})
 	if err != nil {
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("complete: %w (%w)", ErrLLMUnavailable, err))
 	}
-	if flush, _ := stripper.finish(); flush != "" {
+	if flush, _ := stripper.Finish(); flush != "" {
 		onDelta(flush)
 	}
 
