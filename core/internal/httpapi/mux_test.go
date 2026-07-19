@@ -77,9 +77,15 @@ func TestNewMux(t *testing.T) {
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
-			name:       "summary rejects GET",
-			method:     http.MethodGet,
+			name:       "summary rejects PUT",
+			method:     http.MethodPut,
 			path:       "/api/v1/articles/7/summary",
+			wantStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:       "tags rejects PUT",
+			method:     http.MethodPut,
+			path:       "/api/v1/articles/7/tags",
 			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{

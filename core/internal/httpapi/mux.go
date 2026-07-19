@@ -19,6 +19,9 @@ func NewMux(
 	reads ArticleReadMarker,
 	fullTexts FullTextFetcher,
 	summarizer ArticleSummarizer,
+	summaryReader SummaryReader,
+	tagger ArticleTagger,
+	tagsReader TagsReader,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
@@ -29,8 +32,11 @@ func NewMux(
 	mux.HandleFunc("GET /api/v1/articles/{id}", handleGetArticle(article))
 	mux.HandleFunc("POST /api/v1/articles/{id}/read", handleMarkArticleRead(article, reads))
 	mux.HandleFunc("POST /api/v1/articles/{id}/fulltext", handleFetchFullText(article, fullTexts))
+	mux.HandleFunc("GET /api/v1/articles/{id}/summary", handleGetSummary(article, summaryReader))
 	mux.HandleFunc("POST /api/v1/articles/{id}/summary", handleSummarizeArticle(article, summarizer))
 	mux.HandleFunc("POST /api/v1/articles/{id}/summary/stream", handleSummarizeArticleStream(article, summarizer))
+	mux.HandleFunc("GET /api/v1/articles/{id}/tags", handleGetTags(article, tagsReader))
+	mux.HandleFunc("POST /api/v1/articles/{id}/tags", handleTagArticle(article, tagger))
 	// メソッド無しパターンはメソッド不一致時の受け皿(無いと /api/ スタブが 501 で拾ってしまう)
 	mux.HandleFunc("/api/v1/feeds", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/feeds/{id}", handleMethodNotAllowed)
@@ -40,6 +46,7 @@ func NewMux(
 	mux.HandleFunc("/api/v1/articles/{id}/fulltext", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/summary", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/articles/{id}/summary/stream", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/articles/{id}/tags", handleMethodNotAllowed)
 	mux.HandleFunc("/api/", handleAPIStub)
 	return mux
 }

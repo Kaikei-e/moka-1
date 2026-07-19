@@ -34,6 +34,8 @@ export const summarySchema = z.object({
 	created_at: z.string()
 });
 
+export const tagsSchema = z.object({ tags: z.array(z.string()) });
+
 export const articlesResponseSchema = z.object({
 	articles: z.array(articleSchema),
 	next_cursor: z.string().nullable() // カーソルページング。null = 終端
@@ -46,8 +48,10 @@ export const registerResponseSchema = z.object({
 });
 export const fullTextResponseSchema = z.object({ fulltext: fullTextSchema });
 export const summaryResponseSchema = z.object({ summary: summarySchema });
+export const tagsResponseSchema = tagsSchema;
 
 export type Feed = z.infer<typeof feedSchema>;
 export type Article = z.infer<typeof articleSchema>;
 export type FullText = z.infer<typeof fullTextSchema>;
 export type Summary = z.infer<typeof summarySchema>;
+export type Tags = z.infer<typeof tagsSchema>;

@@ -1,4 +1,4 @@
-package summarize
+package llm
 
 import (
 	"encoding/json"
@@ -10,10 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTPCompleterComplete(t *testing.T) {
+func testReq(text string) ChatRequest {
+	return ChatRequest{
+		System:             "system prompt",
+		Text:               text,
+		Temperature:        0.7,
+		TopP:               0.8,
+		TopK:               20,
+		MaxTokens:          1536,
+		ChatTemplateKwargs: map[string]any{"enable_thinking": false},
+	}
+}
+
+func TestClientComplete(t *testing.T) {
 	t.Parallel()
 
-	t.Run("sends ADR00007 sampling params and parses the openai-style response", func(t *testing.T) {
+	t.Run("sends sampling params and parses the openai-style response", func(t *testing.T) {
 		t.Parallel()
 
 		var gotBody map[string]any
@@ -24,22 +36,18 @@ func TestHTTPCompleterComplete(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"model": "unsloth/Qwen3.5-4B-GGUF:Q4_K_M",
 				"choices": []map[string]any{
-					{"message": map[string]any{"role": "assistant", "content": "要約結果"}},
+					{"message": map[string]any{"role": "assistant", "content": "結果"}},
 				},
 			})
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		res, err := c.Complete(t.Context(), "記事本文")
+		c := NewClient(srv.URL, srv.Client())
+		res, err := c.Complete(t.Context(), testReq("記事本文"))
 		require.NoError(t, err)
 
-		assert.Equal(t, "要約結果", res.Text)
-		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Meta["model"])
-		assert.InDelta(t, 0.7, res.Meta["temperature"], 0.0001)
-		assert.InDelta(t, 0.8, res.Meta["top_p"], 0.0001)
-		assert.EqualValues(t, 20, res.Meta["top_k"])
-		assert.Equal(t, false, res.Meta["enable_thinking"])
+		assert.Equal(t, "結果", res.Text)
+		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Model)
 
 		assert.InDelta(t, 0.7, gotBody["temperature"], 0.0001)
 		assert.InDelta(t, 0.8, gotBody["top_p"], 0.0001)
@@ -47,6 +55,8 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		kwargs, ok := gotBody["chat_template_kwargs"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, false, kwargs["enable_thinking"])
+		_, hasResponseFormat := gotBody["response_format"]
+		assert.False(t, hasResponseFormat, "no response_format when Schema is nil")
 
 		messages, ok := gotBody["messages"].([]any)
 		require.True(t, ok)
@@ -56,7 +66,42 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		assert.Equal(t, "記事本文", user["content"])
 	})
 
-	t.Run("non-2xx response is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("Schema set sends response_format json_schema", func(t *testing.T) {
+		t.Parallel()
+
+		var gotBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"model":   "m",
+				"choices": []map[string]any{{"message": map[string]any{"content": `{"tags":["a"]}`}}},
+			})
+		}))
+		defer srv.Close()
+
+		req := testReq("記事本文")
+		req.Schema = &Schema{
+			Name:   "result",
+			Schema: map[string]any{"type": "object"},
+			Strict: true,
+		}
+
+		c := NewClient(srv.URL, srv.Client())
+		res, err := c.Complete(t.Context(), req)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"tags":["a"]}`, res.Text)
+
+		rf, ok := gotBody["response_format"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "json_schema", rf["type"])
+		schema, ok := rf["json_schema"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "result", schema["name"])
+		assert.Equal(t, true, schema["strict"])
+	})
+
+	t.Run("non-2xx response is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -64,12 +109,12 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.Complete(t.Context(), "text")
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), testReq("text"))
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("malformed response body is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("malformed response body is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -78,12 +123,12 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.Complete(t.Context(), "text")
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), testReq("text"))
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("empty choices is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("empty choices is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -92,21 +137,21 @@ func TestHTTPCompleterComplete(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.Complete(t.Context(), "text")
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.Complete(t.Context(), testReq("text"))
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("connection failure is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("connection failure is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewHTTPCompleter("http://127.0.0.1:1", http.DefaultClient)
-		_, err := c.Complete(t.Context(), "text")
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient("http://127.0.0.1:1", http.DefaultClient)
+		_, err := c.Complete(t.Context(), testReq("text"))
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 }
 
-func TestHTTPCompleterCompleteStream(t *testing.T) {
+func TestClientCompleteStream(t *testing.T) {
 	t.Parallel()
 
 	t.Run("sends stream:true and delivers deltas in order via callback", func(t *testing.T) {
@@ -131,17 +176,16 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
+		c := NewClient(srv.URL, srv.Client())
 		var deltas []string
-		res, err := c.CompleteStream(t.Context(), "記事本文", func(delta string) {
+		res, err := c.CompleteStream(t.Context(), testReq("記事本文"), func(delta string) {
 			deltas = append(deltas, delta)
 		})
 		require.NoError(t, err)
 
 		assert.Equal(t, []string{"要約", "結果"}, deltas)
 		assert.Equal(t, "要約結果", res.Text)
-		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Meta["model"])
-		assert.InDelta(t, 0.7, res.Meta["temperature"], 0.0001)
+		assert.Equal(t, "unsloth/Qwen3.5-4B-GGUF:Q4_K_M", res.Model)
 
 		assert.Equal(t, true, gotBody["stream"])
 		messages, ok := gotBody["messages"].([]any)
@@ -151,7 +195,7 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		assert.Equal(t, "記事本文", user["content"])
 	})
 
-	t.Run("non-2xx response is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("non-2xx response is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -159,12 +203,12 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), testReq("text"), func(string) {})
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("malformed chunk is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("malformed chunk is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -175,16 +219,16 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), testReq("text"), func(string) {})
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("stream ending without [DONE] is wrapped as ErrLLMUnavailable (truncation guard)", func(t *testing.T) {
+	t.Run("stream ending without [DONE] is wrapped as ErrUnavailable (truncation guard)", func(t *testing.T) {
 		t.Parallel()
 
 		// llama.cpp がエラー中断してレスポンスを正常クローズした場合の再現:
-		// チャンクは届いたが終端マーカー [DONE] が無い。部分テキストを完全な要約として
+		// チャンクは届いたが終端マーカー [DONE] が無い。部分テキストを完全な結果として
 		// 返してはいけない(冪等保存され再生成されないため)。
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -195,12 +239,12 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), testReq("text"), func(string) {})
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("stream with no chunks at all is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("stream with no chunks at all is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -208,16 +252,16 @@ func TestHTTPCompleterCompleteStream(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewHTTPCompleter(srv.URL, srv.Client())
-		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient(srv.URL, srv.Client())
+		_, err := c.CompleteStream(t.Context(), testReq("text"), func(string) {})
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 
-	t.Run("connection failure is wrapped as ErrLLMUnavailable", func(t *testing.T) {
+	t.Run("connection failure is wrapped as ErrUnavailable", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewHTTPCompleter("http://127.0.0.1:1", http.DefaultClient)
-		_, err := c.CompleteStream(t.Context(), "text", func(string) {})
-		require.ErrorIs(t, err, ErrLLMUnavailable)
+		c := NewClient("http://127.0.0.1:1", http.DefaultClient)
+		_, err := c.CompleteStream(t.Context(), testReq("text"), func(string) {})
+		require.ErrorIs(t, err, ErrUnavailable)
 	})
 }

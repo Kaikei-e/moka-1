@@ -7,6 +7,7 @@ import {
 	fullTextResponseSchema,
 	registerResponseSchema,
 	summaryResponseSchema,
+	tagsResponseSchema,
 	type Article,
 	type Feed,
 	type FullText,
@@ -179,4 +180,51 @@ export async function summarizeArticleStream(
 ): Promise<Response> {
 	const url = `${baseURL()}/api/v1/articles/${articleId}/summary/stream${force ? '?force=true' : ''}`;
 	return fetchFn(url, { method: 'POST' });
+}
+
+// GET /api/v1/articles/{id}/summary は純粋な読み取り — LLM を呼ばない。
+// enrich.Scheduler が既に自動生成した要約を、ボタンを押さず確認するための窓口(grill決定)。
+// 見つからない(404)は「まだ濃縮されていない」という通常の状態であって例外ではない。
+export async function getSummary(
+	fetchFn: typeof fetch,
+	articleId: number
+): Promise<Summary | null> {
+	const res = await fetchFn(`${baseURL()}/api/v1/articles/${articleId}/summary`);
+	if (res.status === 404) return null;
+	if (!res.ok) throw new Error(`moka-core get summary ${articleId}: ${res.status}`);
+	return summaryResponseSchema.parse(await res.json()).summary;
+}
+
+// GET /api/v1/articles/{id}/tags は純粋な読み取り — LLM を呼ばない(getSummary と対称)。
+export async function getTags(fetchFn: typeof fetch, articleId: number): Promise<string[] | null> {
+	const res = await fetchFn(`${baseURL()}/api/v1/articles/${articleId}/tags`);
+	if (res.status === 404) return null;
+	if (!res.ok) throw new Error(`moka-core get tags ${articleId}: ${res.status}`);
+	return tagsResponseSchema.parse(await res.json()).tags;
+}
+
+export type TagResult =
+	{ ok: true; created: boolean; tags: string[] } | { ok: false; status: number; message: string };
+
+// moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)
+const tagErrorMessages: Record<number, string> = {
+	400: 'この記事にタグを付けられません',
+	404: '記事が見つかりません',
+	422: 'タグの抽出に失敗しました。再試行してください',
+	502: 'タグの抽出に失敗しました。時間をおいて再試行してください'
+};
+
+// タグ抽出は冪等(moka-core 側で保存済みなら再生成しない) — 新規 201 / 既存 200。
+// force は無い(summarize と違い、article_tags は追記のみで削除しないため意味が薄い)。
+export async function tagArticle(fetchFn: typeof fetch, articleId: number): Promise<TagResult> {
+	const res = await fetchFn(`${baseURL()}/api/v1/articles/${articleId}/tags`, { method: 'POST' });
+	if (res.status === 200 || res.status === 201) {
+		const body = tagsResponseSchema.parse(await res.json());
+		return { ok: true, created: res.status === 201, tags: body.tags };
+	}
+	return {
+		ok: false,
+		status: res.status,
+		message: tagErrorMessages[res.status] ?? 'タグの抽出に失敗しました。再試行してください'
+	};
 }

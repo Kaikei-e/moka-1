@@ -14,6 +14,7 @@
 	// 検知してリセットする(既読打刻も同じ契機で記事ごとに一度ずつ飛ぶ)。
 	import DripIndicator from '$lib/components/DripIndicator.svelte';
 	import SummaryCard from '$lib/components/SummaryCard.svelte';
+	import TagList from '$lib/components/TagList.svelte';
 	import { toParagraphs } from '$lib/article-text';
 	import { sanitizeArticleHtml } from '$lib/sanitize';
 	import { hostnameOf, isSafeExternalUrl } from '$lib/url';
@@ -86,6 +87,7 @@
 	</header>
 
 	<SummaryCard articleId={data.article.id} />
+	<TagList articleId={data.article.id} />
 
 	{#if fullTextHtml}
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- fullTextHtml は sanitizeArticleHtml (DOMPurify、許可タグ限定) を通した後の値のみ -->

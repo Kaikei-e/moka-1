@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
+	"github.com/Kaikei-e/moka-1/core/internal/llm"
 )
 
 // ドメイン境界の sentinel。httpapi がステータスコードへ写像する。
@@ -88,35 +89,8 @@ type Completer interface {
 	CompleteStream(ctx context.Context, text string, onRawDelta func(delta string)) (CompletionResult, error)
 }
 
-// think タグの開閉境界。stripThink と thinkStreamStripper の両方が参照する。
-const (
-	openTag  = "<think>"
-	closeTag = "</think>"
-)
-
-// stripThink は Qwen 系モデルが(flag が効かなかった場合の防御として)応答冒頭に付ける
-// <think>...</think> CoT を機械的に剥がす。think タグは応答冒頭(先頭空白は許容)のみを
-// 対象とする — 本文途中の "<think>" は引用等の本文とみなし、thinkStreamStripper の
-// ストリーミング判定とも一致させる(片方だけ途中一致だと、ストリームで見えた本文と
-// 保存される本文が食い違う)。閉じずに truncate された場合は closed=false
-// (呼び出し元は ErrEmptyCompletion を返すべき)。
-func stripThink(raw string) (text string, stripped bool, closed bool) {
-	rest, ok := strings.CutPrefix(strings.TrimLeft(raw, thinkLeadingSpace), openTag)
-	if !ok {
-		return strings.TrimSpace(raw), false, true
-	}
-
-	_, after, ok := strings.Cut(rest, closeTag)
-	if !ok {
-		return "", true, false
-	}
-
-	return strings.TrimSpace(after), true, true
-}
-
-// thinkLeadingSpace は think タグ検出時に無視する応答冒頭の空白類(Qwen は "\n<think>" の
-// ように改行を先行させることがある)。
-const thinkLeadingSpace = " \t\r\n"
+// think タグの開閉境界(llm.OpenTag/llm.CloseTag/llm.ThinkLeadingSpace)は
+// llm.StripThink と thinkStreamStripper の両方が参照する共通の単一ソース。
 
 // thinkStreamStripState は thinkStreamStripper の内部フェーズ。
 type thinkStreamStripState int
@@ -145,7 +119,7 @@ func (s *thinkStreamStripper) feed(chunk string) string {
 	case thinkStreamInsideThink:
 		s.pending.WriteString(chunk)
 		buffered := s.pending.String()
-		_, after, ok := strings.Cut(buffered, closeTag)
+		_, after, ok := strings.Cut(buffered, llm.CloseTag)
 		if !ok {
 			return ""
 		}
@@ -157,24 +131,24 @@ func (s *thinkStreamStripper) feed(chunk string) string {
 		buffered := s.pending.String()
 		// stripThink と同じ判定: 先頭空白は許容した上で、冒頭が <think> の時だけ think モード。
 		// 先頭空白をスキップしないと "\n<think>" で passthrough に落ち、CoT が丸ごと漏れる。
-		trimmed := strings.TrimLeft(buffered, thinkLeadingSpace)
-		if len(trimmed) < len(openTag) {
-			if strings.HasPrefix(openTag, trimmed) {
+		trimmed := strings.TrimLeft(buffered, llm.ThinkLeadingSpace)
+		if len(trimmed) < len(llm.OpenTag) {
+			if strings.HasPrefix(llm.OpenTag, trimmed) {
 				return "" // まだ <think> かどうか確定しない — 保留
 			}
 			s.pending.Reset()
 			s.state = thinkStreamPassthrough
 			return buffered
 		}
-		if !strings.HasPrefix(trimmed, openTag) {
+		if !strings.HasPrefix(trimmed, llm.OpenTag) {
 			s.pending.Reset()
 			s.state = thinkStreamPassthrough
 			return buffered
 		}
-		rest := trimmed[len(openTag):]
+		rest := trimmed[len(llm.OpenTag):]
 		s.pending.Reset()
 		s.state = thinkStreamInsideThink
-		_, after, ok := strings.Cut(rest, closeTag)
+		_, after, ok := strings.Cut(rest, llm.CloseTag)
 		if !ok {
 			s.pending.WriteString(rest)
 			return ""

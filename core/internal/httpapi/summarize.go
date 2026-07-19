@@ -30,6 +30,46 @@ func forceRegenerate(r *http.Request) bool {
 	return r.URL.Query().Get("force") == "true"
 }
 
+// SummaryReader は要約の読み取り専用ポート(具象は *store.Store)。LLM は一切呼ばない —
+// GET /summary は「濃縮ずみなら見せる」だけの窓口(enrich.Scheduler が自動生成した要約を
+// UI がボタンを押さず確認できるようにする、grill決定)。
+type SummaryReader interface {
+	LatestSummary(ctx context.Context, articleID int64) (summarize.Summary, bool, error)
+}
+
+// handleGetSummary は GET /api/v1/articles/{id}/summary。純粋な読み取り — LLM を呼ばない。
+// 要約が無ければ 404(まだ enrich.Scheduler が処理していない、または恒久的に失敗した)。
+func handleGetSummary(articles ArticleGetter, reader SummaryReader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid article id")
+			return
+		}
+
+		_, found, err := articles.GetArticle(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if !found {
+			writeError(w, http.StatusNotFound, "article not found")
+			return
+		}
+
+		sum, found, err := reader.LatestSummary(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if !found {
+			writeError(w, http.StatusNotFound, "summary not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]summarize.Summary{"summary": sum})
+	}
+}
+
 // handleSummarizeArticle は POST /api/v1/articles/{id}/summary。冪等: 新規 201 / 既存 200。
 // ?force=true を付けると既存要約があっても無視して常に新規生成する(この場合も 201)。
 // 記事が無ければ 404(要約対象のフィード由来 content は articles テーブルから引く。

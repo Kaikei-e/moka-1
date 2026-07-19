@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """E2E 用の OpenAI 互換チャット補完モック(stdlib のみ、pip install 不要)。
 
-core/internal/summarize/client.go(HTTPCompleter)が話す最小限だけを実装する:
+core/internal/llm.Client(summarize/tags 共通の HTTP 機構)が話す最小限だけを実装する:
 POST {LLM_BASE_URL}/chat/completions(非ストリーム・SSE ストリームの両方)と GET /health。
+response_format(json_schema、タグ抽出が使う)を検知したら tags 用の決定的な JSON を返す —
+それ以外(要約)は自由形式の固定文言を返す。
 本物の llm(llama.cpp server, compose.yaml)と同じ 8081/health 契約に合わせてある。
 GitHub-hosted runner には GPU が無く本物の llm(iGPU Vulkan passthrough)を起動できないため、
 CI の E2E ではこのモックを compose.e2e.yaml 経由で LLM_BASE_URL に差し込む。
@@ -16,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PORT = int(os.environ.get("PORT", "8081"))
 MODEL = os.environ.get("MOCK_LLM_MODEL", "mock-model")
 CONTENT = os.environ.get("MOCK_LLM_CONTENT", "これはE2E用のモックLLM応答です。")
+TAGS = os.environ.get("MOCK_LLM_TAGS", "E2Eタグ1,E2Eタグ2")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -42,15 +45,21 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             req = {}
 
-        if req.get("stream"):
+        if req.get("response_format", {}).get("type") == "json_schema":
+            self._full_response(self._tags_content())
+        elif req.get("stream"):
             self._stream_response()
         else:
-            self._full_response()
+            self._full_response(CONTENT)
 
-    def _full_response(self):
+    def _tags_content(self):
+        names = [t.strip() for t in TAGS.split(",") if t.strip()]
+        return json.dumps({"tags": names}, ensure_ascii=False)
+
+    def _full_response(self, content):
         body = {
             "model": MODEL,
-            "choices": [{"message": {"role": "assistant", "content": CONTENT}}],
+            "choices": [{"message": {"role": "assistant", "content": content}}],
         }
         self._json(200, body)
 

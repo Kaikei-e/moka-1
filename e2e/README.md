@@ -46,7 +46,11 @@ hurl --test --jobs 1 \
 # 欠番が増えないことの検証。独自フィードを登録するので、上記の厳密なカウントアサーションの後に走らせる
 bash e2e/hurl/core/dedupe_no_304_e2e.sh
 
-# 5. 常駐スケジューラ(バックグラウンド自律取得)の検証は独自フィードを登録するので、
+# 5. enrich.Scheduler(常駐エージェントループの濃縮ステップ)が、手動の POST 無しに
+# 新着記事へ summary/tags を自動で付けることの検証(M1)。独自フィードを登録する
+bash e2e/hurl/core/enrich_e2e.sh
+
+# 6. 常駐スケジューラ(バックグラウンド自律取得)の検証は独自フィードを登録するので、
 # 上記の「ちょうどN件」前提の厳密なカウントアサーションを崩さないよう必ず最後に走らせる
 bash e2e/hurl/core/scheduler_e2e.sh
 ```
@@ -83,14 +87,16 @@ docker compose -f compose.yaml -f compose.e2e.yaml rm -f e2e-db e2e-migrate e2e-
   5 上限の勘定外、tenets §2-3 — e2e-fixtures と同じ扱い)。本番の `db` / `migrate` / `llm` も
   e2e 実行時に依存関係上一緒に起動しうるが、moka-core は接続しないので触れられない
 - `e2e-llm-mock`(`e2e/mock-llm/mock_llm.py`)は本物の llm(iGPU Vulkan passthrough が必要)の
-  代わりに決定的な要約文字列を返す OpenAI 互換モック。GitHub-hosted runner に GPU が無いための
+  代わりに決定的な応答を返す OpenAI 互換モック。GitHub-hosted runner に GPU が無いための
   代替で、moka-core → LLM クライアント → DB保存 → API → UI の配線は実コードのまま検証する
   (推論品質そのものは eval/ の管轄。fail-soft 設計により moka-core は本番では `llm` に依存しないが、
-  e2e 限定で `LLM_BASE_URL` を e2e-llm-mock へ向けている)
+  e2e 限定で `LLM_BASE_URL` を e2e-llm-mock へ向けている)。`response_format`(json_schema、
+  タグ抽出が使う)を検知したら決定的な `{"tags": [...]}` を返し、それ以外(要約)は固定文言を返す
 - nginx は静的ファイルに ETag / Last-Modified を自動付与するので、再登録シナリオが
   条件付き GET(304)の経路を実際に通る
-- `MOKA_SCHEDULER_TICK_SECONDS=3`(compose.e2e.yaml のみ)。常駐スケジューラの due 判定
-  ポーリング間隔を短縮し、`scheduler_e2e.sh` の待ち時間を短くする(本番既定は60秒)
+- `MOKA_SCHEDULER_TICK_SECONDS=3` / `MOKA_ENRICH_TICK_SECONDS=2`(compose.e2e.yaml のみ)。
+  常駐スケジューラ・enrich.Scheduler それぞれの due/pending 判定ポーリング間隔を短縮し、
+  `scheduler_e2e.sh` / `enrich_e2e.sh` の待ち時間を短くする(本番既定は60秒/15秒)
 - Playwright がフォームに入れる fixture URL は moka-core が docker ネットワーク内で解決する
   (ブラウザからは触らない)ので、ホスト側の名前解決は不要
 - CI では Hurl に `--report-junit reports/junit.xml` を付ける

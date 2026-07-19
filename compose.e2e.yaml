@@ -17,6 +17,9 @@ services:
       # スケジューラの due 判定ポーリング間隔を短縮(既定60秒のままだと scheduler_e2e.sh の
       # ポーリング待ちが長くなりすぎる)
       MOKA_SCHEDULER_TICK_SECONDS: "3"
+      # enrich.Scheduler の pending 判定ポーリング間隔も同様に短縮(既定15秒だと
+      # enrich_e2e.sh のポーリング待ちが長くなりすぎる)
+      MOKA_ENRICH_TICK_SECONDS: "2"
     depends_on:
       e2e-db:
         condition: service_healthy

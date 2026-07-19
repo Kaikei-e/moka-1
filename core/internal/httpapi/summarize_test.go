@@ -47,6 +47,18 @@ func (f *fakeSummarizer) SummarizeStream(
 	return summarize.Result{}, nil
 }
 
+// fakeSummaryReader は SummaryReader のテストフェイク。
+type fakeSummaryReader struct {
+	get func(ctx context.Context, articleID int64) (summarize.Summary, bool, error)
+}
+
+func (f *fakeSummaryReader) LatestSummary(ctx context.Context, articleID int64) (summarize.Summary, bool, error) {
+	if f.get == nil {
+		return summarize.Summary{}, false, nil
+	}
+	return f.get(ctx, articleID)
+}
+
 func TestHandleSummarizeArticle(t *testing.T) {
 	t.Parallel()
 

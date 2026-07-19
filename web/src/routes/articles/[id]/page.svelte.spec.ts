@@ -59,24 +59,37 @@ function sseResponse(status: number, events: SSEEvent[]) {
 	return new Response(text, { status, headers: { 'Content-Type': 'text/event-stream' } });
 }
 
-// 全文取り寄せ・要約はどちらも明示ボタンが引き金(自動取得しない)で、独立したボタンから
-// 別々の URL を叩く。既読打刻(/read)は開いた瞬間に fire-and-forget で必ず飛ぶ。
-// 同じ Page 内で全部を検証できるよう、呼び先を URL で振り分ける。
+// 全文取り寄せ・要約/タグ抽出は明示ボタンが引き金。マウント時の GET(/summary・/tags)は
+// 濃縮済み確認だけで LLM は呼ばない。既読打刻(/read)は開いた瞬間に fire-and-forget。
+// 同じ Page 内で全部を検証できるよう、呼び先を URL + method で振り分ける。
 function routeFetch(
 	overrides: Partial<{
 		fulltext: () => Promise<Response>;
 		summary: () => Promise<Response>;
+		summaryGet: () => Promise<Response>;
+		tags: () => Promise<Response>;
+		tagsGet: () => Promise<Response>;
 		read: () => Promise<Response>;
 	}> = {}
 ) {
 	const fulltext =
 		overrides.fulltext ?? (() => Promise.reject(new Error('unmocked fulltext fetch')));
 	const summary = overrides.summary ?? (() => Promise.reject(new Error('unmocked summary fetch')));
+	const summaryGet =
+		overrides.summaryGet ?? (() => jsonResponse(404, { error: 'summary not found' }));
+	const tags = overrides.tags ?? (() => Promise.reject(new Error('unmocked tags fetch')));
+	const tagsGet = overrides.tagsGet ?? (() => jsonResponse(404, { error: 'tags not found' }));
 	const read = overrides.read ?? (() => Promise.resolve(new Response(null, { status: 204 })));
-	return vi.fn((input: RequestInfo | URL) => {
+	return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
 		const url = typeof input === 'string' ? input : input.toString();
+		const method = (
+			init?.method ??
+			(typeof input !== 'string' && 'method' in input ? input.method : undefined) ??
+			'GET'
+		).toUpperCase();
 		if (url.includes('/fulltext')) return fulltext();
-		if (url.includes('/summary')) return summary();
+		if (url.includes('/tags')) return method === 'GET' ? tagsGet() : tags();
+		if (url.includes('/summary')) return method === 'GET' ? summaryGet() : summary();
 		if (url.includes('/read')) return read();
 		return Promise.reject(new Error(`unmocked fetch: ${url}`));
 	});
@@ -282,6 +295,7 @@ describe('articles/[id] reading view — 要約(moka による濃縮)', () => {
 
 		await expect.element(page.getByText('moka による要約')).toBeVisible();
 		await expect.element(page.getByRole('button', { name: '要約する' })).toBeVisible();
+		// マウント時の GET 確認は summaryGet 側。ストリーム(POST)はボタン押下まで飛ばない。
 		expect(summaryFetch).not.toHaveBeenCalled();
 
 		await page.getByRole('button', { name: '要約する' }).click();

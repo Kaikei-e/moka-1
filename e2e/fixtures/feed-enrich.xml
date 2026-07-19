@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(enrich.Scheduler 自動濃縮検証用)。enrich_e2e.sh がこの
+     フィードを登録し、手動 POST を一切行わずに summary/tags が自動で付くことだけを確認する。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E Enrich Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying enrich.Scheduler auto-attaches summary and tags</description>
+    <item>
+      <title>Enrich article 1</title>
+      <link>http://e2e-fixtures/articles/enrich-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-enrich:1</guid>
+      <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Body of the enrich fixture article, long enough to summarize and tag.</description>
+    </item>
+  </channel>
+</rss>

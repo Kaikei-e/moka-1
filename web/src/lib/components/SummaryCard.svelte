@@ -1,10 +1,14 @@
 <script lang="ts">
 	// 要約カード(DESIGN_LANGUAGE §8.1)。AI の声なので fujinezu 面 + ゴシック、印は金泥。
-	// 全文取り寄せ(§5.3)と同じ作法: 明示ボタンのみが引き金(自動取得しない)。
+	//
+	// enrich.Scheduler(常駐エージェントループ)が新着記事に要約を自動付与するようになった
+	// ため、マウント時に GET /articles/{id}/summary で「濃縮済みか」を純粋に確認する
+	// (LLM は呼ばない)。あれば即表示、無ければ全文取り寄せ(§5.3)と同じ明示ボタンの
+	// 作法にフォールバックする(grill決定 — 自動生成済みのものをボタンの裏に隠さない)。
 	// moka-core 側は冪等なので、既に生成済みなら再生成せず保存済みの要約をそのまま返す。
 	//
 	// SvelteKit は同一ルート内の遷移でこのコンポーネントインスタンスを再利用するため、
-	// articleId の変化を検知して状態をリセットする(記事ごとにボタンから出し直す)。
+	// articleId の変化を検知して状態をリセットする(記事ごとに確認からやり直す)。
 	import DripIndicator from './DripIndicator.svelte';
 	import { REGENERATE_SUMMARY, RETRY_SUMMARIZE, SUMMARIZE, SUMMARIZING } from '$lib/copy';
 
@@ -16,6 +20,9 @@
 	// loading(最初のトークンまで)と違い、ストリームが閉じるまで立ちっぱなしのフラグ
 	let streaming = $state(false);
 	let error = $state<string | null>(null);
+	// checked: マウント時の GET 確認が完了したか。完了するまではボタンもテキストも
+	// 出さない(まだ濃縮済みかどうか分からない状態で「要約する」ボタンを一瞬見せない)。
+	let checked = $state(false);
 	// 直前の試行が通常生成か「やり直し」かを覚えておく — 失敗後の再試行ボタンは
 	// 同じモードで再送する(やり直しの失敗を「要約する」で再試行すると、moka-core が
 	// 保存済みの古い要約をそのまま返すだけで何も変わらない)。
@@ -23,12 +30,28 @@
 
 	$effect(() => {
 		const id = articleId; // 依存の確立(記事切り替えのたびにリセットする)
-		void id;
 		text = null;
 		loading = false;
 		streaming = false;
 		error = null;
+		checked = false;
 		lastForce = false;
+
+		void (async () => {
+			try {
+				const res = await fetch(`/articles/${id}/summary`);
+				if (id !== articleId) return; // 応答待ちの間に記事が切り替わった
+				if (res.ok) {
+					const body = await res.json();
+					if (id !== articleId) return;
+					text = body.summary?.text ?? null;
+				}
+			} catch {
+				// 確認できなくても明示ボタンにフォールバックするだけ(fail-soft)
+			} finally {
+				if (id === articleId) checked = true;
+			}
+		})();
 	});
 
 	// SSE の1イベント("event: foo\ndata: {...}"、\n\n区切り済み)を状態へ反映する。
@@ -118,7 +141,7 @@
 		</svg>
 		moka による要約
 	</h2>
-	{#if text === null && !loading}
+	{#if checked && text === null && !loading}
 		<button class="summarize-button" onclick={() => summarize(lastForce)}
 			>{error ? RETRY_SUMMARIZE : SUMMARIZE}</button
 		>

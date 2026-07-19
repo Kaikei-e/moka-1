@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/Kaikei-e/moka-1/core/internal/llm"
 )
 
 // attemptKind は enrichment_attempts.kind の値(db/schema.sql の CHECK 制約に合わせる)。
@@ -58,7 +60,7 @@ func (s *Service) Summarize(ctx context.Context, articleID int64, articleContent
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("complete: %w (%w)", ErrLLMUnavailable, err))
 	}
 
-	summaryText, stripped, closed := stripThink(completion.Text)
+	summaryText, stripped, closed := llm.StripThink(completion.Text)
 	if !closed {
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("think tag truncated: %w", ErrEmptyCompletion))
 	}
@@ -131,7 +133,7 @@ func (s *Service) SummarizeStream(
 		onDelta(flush)
 	}
 
-	summaryText, stripped, closed := stripThink(completion.Text)
+	summaryText, stripped, closed := llm.StripThink(completion.Text)
 	if !closed {
 		return Result{}, s.fail(ctx, articleID, fmt.Errorf("think tag truncated: %w", ErrEmptyCompletion))
 	}

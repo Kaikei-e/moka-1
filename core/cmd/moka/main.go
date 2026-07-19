@@ -16,11 +16,14 @@ import (
 
 	"os/signal"
 
+	"github.com/Kaikei-e/moka-1/core/internal/enrich"
 	"github.com/Kaikei-e/moka-1/core/internal/feed"
 	"github.com/Kaikei-e/moka-1/core/internal/fulltext"
 	"github.com/Kaikei-e/moka-1/core/internal/httpapi"
+	"github.com/Kaikei-e/moka-1/core/internal/llm"
 	"github.com/Kaikei-e/moka-1/core/internal/store"
 	"github.com/Kaikei-e/moka-1/core/internal/summarize"
+	"github.com/Kaikei-e/moka-1/core/internal/tags"
 )
 
 const listenAddr = ":8080"
@@ -56,13 +59,17 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	validator := feed.NewURLValidator(allowPrivate)
 	registrar := feed.NewRegistrar(st, feed.NewHTTPFetcher(validator), validator, logger)
 	fullTexts := fulltext.NewService(st, fulltext.NewHTTPFetcher(validator), fulltext.NewTrafilaturaExtractor(), validator)
-	completer := summarize.NewHTTPCompleter(os.Getenv("LLM_BASE_URL"), &http.Client{Timeout: 90 * time.Second})
-	summarizer := summarize.NewService(st, st, completer, logger)
-	scheduler := feed.NewScheduler(st, registrar, schedulerTick(), logger)
+	llmClient := llm.NewClient(os.Getenv("LLM_BASE_URL"), &http.Client{Timeout: 90 * time.Second})
+	summarizer := summarize.NewService(st, st, summarize.NewLLMCompleter(llmClient), logger)
+	tagger := tags.NewService(st, st, tags.NewLLMCompleter(llmClient), logger)
+	feedScheduler := feed.NewScheduler(st, registrar, schedulerTick(), logger)
+	enrichScheduler := enrich.NewScheduler(st, st, summarizer, tagger, enrichTick(), logger)
 
 	server := &http.Server{
-		Addr:              listenAddr,
-		Handler:           httpapi.NewMux(registrar, st, st, st, st, st, fullTexts, summarizer),
+		Addr: listenAddr,
+		Handler: httpapi.NewMux(
+			registrar, st, st, st, st, st, fullTexts, summarizer, st, tagger, st,
+		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -83,7 +90,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		}
 	})
 	wg.Go(func() {
-		scheduler.Run(schedCtx)
+		feedScheduler.Run(schedCtx)
+	})
+	wg.Go(func() {
+		enrichScheduler.Run(schedCtx)
 	})
 
 	select {
@@ -108,6 +118,16 @@ func run(ctx context.Context, logger *slog.Logger) error {
 func schedulerTick() time.Duration {
 	const def = 60 * time.Second
 	n, err := strconv.Atoi(os.Getenv("MOKA_SCHEDULER_TICK_SECONDS"))
+	if err != nil || n <= 0 {
+		return def
+	}
+	return time.Duration(n) * time.Second
+}
+
+// enrichTick は濃縮 pending 判定のポーリング間隔(既定15秒、MOKA_ENRICH_TICK_SECONDS で上書き可能)。
+func enrichTick() time.Duration {
+	const def = 15 * time.Second
+	n, err := strconv.Atoi(os.Getenv("MOKA_ENRICH_TICK_SECONDS"))
 	if err != nil || n <= 0 {
 		return def
 	}

@@ -38,9 +38,9 @@ def _write_summary(name: str, payload: dict[str, object]) -> None:
     print(f"wrote {path}")
 
 
-def cmd_smoke(_: argparse.Namespace) -> int:
+def cmd_smoke(args: argparse.Namespace) -> int:
     print(_STOP_REMINDER)
-    spec = model("lfm25")
+    spec = model(args.model)
     print(f"baseline: {format_snapshot(mem_snapshot())}")
     with llama_server(spec) as handle:
         print(f"ready in {handle.load_time_s:.1f}s: {format_snapshot(mem_snapshot())}")
@@ -348,7 +348,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="moka-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("smoke").set_defaults(func=cmd_smoke)
+    p = sub.add_parser("smoke")
+    # 既定は採用モデル(ADR00007: 高速パス = Qwen3.5-4B)。lfm25 は同ADRで不採用になった
+    # 候補だが、記録として残すため --model で明示すれば引き続きスモークできる
+    p.add_argument("--model", default="qwen35-4b")
+    p.set_defaults(func=cmd_smoke)
     sub.add_parser("models").set_defaults(func=cmd_models)
 
     p = sub.add_parser("bench")

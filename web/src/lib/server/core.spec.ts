@@ -3,12 +3,15 @@ import {
 	deleteFeed,
 	fetchFullText,
 	getArticle,
+	getSummary,
+	getTags,
 	listArticlesPage,
 	listFeeds,
 	markArticleRead,
 	registerFeed,
 	summarizeArticle,
-	summarizeArticleStream
+	summarizeArticleStream,
+	tagArticle
 } from './core';
 
 const article = {
@@ -265,6 +268,68 @@ describe('summarizeArticle', () => {
 		[500, '要約に失敗しました。再試行してください']
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await summarizeArticle(fetchStub(status, { error: 'x' }), 7);
+		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('getSummary', () => {
+	const summary = {
+		article_id: 7,
+		text: '保存済みの要約',
+		model_meta: { model: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M' },
+		created_at: '2026-07-01T09:00:00Z'
+	};
+
+	it('parses the summary envelope when one exists (LLM is never called for reads)', async () => {
+		const got = await getSummary(fetchStub(200, { summary }), 7);
+		expect(got).toEqual(summary);
+	});
+
+	it('returns null when no summary exists yet (not-yet-enriched is not an error)', async () => {
+		const got = await getSummary(fetchStub(404, { error: 'summary not found' }), 7);
+		expect(got).toBeNull();
+	});
+
+	it('rejects on other errors', async () => {
+		await expect(getSummary(fetchStub(500, { error: 'internal error' }), 7)).rejects.toThrow();
+	});
+});
+
+describe('getTags', () => {
+	it('parses the tags envelope when tags exist', async () => {
+		const got = await getTags(fetchStub(200, { tags: ['タグ1', 'タグ2'] }), 7);
+		expect(got).toEqual(['タグ1', 'タグ2']);
+	});
+
+	it('returns null when no tags exist yet (not-yet-enriched is not an error)', async () => {
+		const got = await getTags(fetchStub(404, { error: 'tags not found' }), 7);
+		expect(got).toBeNull();
+	});
+
+	it('rejects on other errors', async () => {
+		await expect(getTags(fetchStub(500, { error: 'internal error' }), 7)).rejects.toThrow();
+	});
+});
+
+describe('tagArticle', () => {
+	it('maps 201 to a created result', async () => {
+		const got = await tagArticle(fetchStub(201, { tags: ['タグ1'] }), 7);
+		expect(got).toEqual({ ok: true, created: true, tags: ['タグ1'] });
+	});
+
+	it('maps 200 to an already-tagged result', async () => {
+		const got = await tagArticle(fetchStub(200, { tags: ['タグ1'] }), 7);
+		expect(got).toMatchObject({ ok: true, created: false });
+	});
+
+	it.each([
+		[400, 'この記事にタグを付けられません'],
+		[404, '記事が見つかりません'],
+		[422, 'タグの抽出に失敗しました。再試行してください'],
+		[502, 'タグの抽出に失敗しました。時間をおいて再試行してください'],
+		[500, 'タグの抽出に失敗しました。再試行してください']
+	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
+		const got = await tagArticle(fetchStub(status, { error: 'x' }), 7);
 		expect(got).toEqual({ ok: false, status, message });
 	});
 });
