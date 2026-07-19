@@ -177,10 +177,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: E2E 用の使い捨て postgres secret を用意
+      - name: E2E 用の使い捨て secret を用意(postgres + session HMAC)
+        # session_hmac_key は moka-core の compose secret 契約(ADR00021)。plecto はこの
+        # E2E ジョブでは起動しないので plecto_filter_signing_key は不要
         run: |
           mkdir -p secrets
           openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt
+          openssl rand -hex 32 > secrets/session_hmac_key.txt
       - name: install hurl (ローカル開発環境と同じ 8.0.1 に固定)
         run: |
           curl -fsSL -o /tmp/hurl.deb https://github.com/Orange-OpenSource/hurl/releases/download/8.0.1/hurl_8.0.1_amd64.deb
@@ -225,10 +228,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: E2E 用の使い捨て postgres secret を用意
+      - name: E2E 用の使い捨て secret を用意(postgres + session HMAC)
+        # session_hmac_key は moka-core の compose secret 契約(ADR00021)。plecto はこの
+        # E2E ジョブでは起動しないので plecto_filter_signing_key は不要
         run: |
           mkdir -p secrets
           openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt
+          openssl rand -hex 32 > secrets/session_hmac_key.txt
       - uses: pnpm/action-setup@008330803749db0355799c700092d9a85fd074e9 # v6.0.9
         with:
           version: 11

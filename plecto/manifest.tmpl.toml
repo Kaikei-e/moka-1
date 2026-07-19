@@ -116,6 +116,23 @@ filters = ["ratelimit"]
 [route.match]
 path_prefix = "/healthz"
 
+# SvelteKit のビルド済み静的アセット(ハッシュ付きファイル名、機密なし)。
+# ここに session-auth を掛けると /auth/login 自体が読み込む JS/CSS が 401 になり、
+# 「ログインしないとログイン画面が動かない」自己矛盾で全ユーザーが締め出される
+# (2026-07-19 本番incident — moka.curionoah.com で全アセット401を確認)
+[[route]]
+upstream = "moka-web"
+filters = ["ratelimit"]
+[route.match]
+path_prefix = "/_app"
+
+# 同上の理由でフィード用ファビコン等の静的ファイルも認証対象外
+[[route]]
+upstream = "moka-web"
+filters = ["ratelimit"]
+[route.match]
+path_prefix = "/robots.txt"
+
 # それ以外すべて(読むための UI): レート制限 → セッション認証の順で通す
 [[route]]
 upstream = "moka-web"
