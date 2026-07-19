@@ -1,6 +1,7 @@
 # moka-1 — `docker compose up -d --wait` 一発で全部が上がる(tenets §2-1)
 # 常駐サービス = 5: plecto / moka-core / moka-web / db / llm(tenets §2-3)
-# migrate と plecto-certs-init は one-shot ジョブ(ADR00001)で常駐上限には数えない
+# migrate / plecto-certs-init / plecto-filters-build / plecto-manifest-render は
+# one-shot ジョブ(ADR00001)で常駐上限には数えない
 name: moka
 
 services:
@@ -34,7 +35,48 @@ services:
       - plecto-certs:/certs
     restart: "no"
 
-  # エッジ: TLS 終端、HTTP/1·2·3、ルーティング。Phase 1 は素通し(plecto/manifest.toml)。
+  # WASM フィルタ 2 枚(session-auth / ratelimit)をビルド → component 化 → 署名 →
+  # OCI image-layout 生成まで行う one-shot ジョブ(Phase 2、tenets §3.5)。
+  # Plecto は bare .wasm をロードしない(署名済み OCI layout + digest pin + [trust] が必須、
+  # fail-closed)ため、パッケージングまでがビルドの仕事。手順本体は plecto/build/filters-build.sh。
+  # cargo レジストリ / target / wasm-tools は named volume にキャッシュし 2 回目以降を高速化。
+  # フィルタのソースを変えたら: docker compose run --rm plecto-filters-build
+  #                       → docker compose run --rm plecto-manifest-render
+  #                       → docker compose kill -s HUP plecto
+  plecto-filters-build:
+    image: rust:1.96.1-trixie@sha256:1f0dbad1df66647807e6952d1db85d0b2bda7606cb2139d82517e4f009967376 # Plecto 本体の rust-toolchain.toml(1.96.0 系)に合わせて pin
+    entrypoint: ["/bin/bash", "/job/filters-build.sh"]
+    volumes:
+      - ./plecto/build:/job:ro
+      - ./plecto/filters:/src:ro
+      - plecto-build-cache:/cache
+      - plecto-runtime:/out
+    secrets:
+      - plecto_filter_signing_key
+    restart: "no"
+
+  # manifest テンプレートに Docker secret(session_hmac_key)とビルド済みフィルタの digest を
+  # 埋めて、plecto が読む完成 manifest を plecto-runtime volume にレンダリングする one-shot
+  # ジョブ。Plecto の [filter.config] にはファイル間接参照・env 展開が無く(インライン文字列
+  # のみ)、ファイルベース secrets(ADR00003)とはここで橋渡しする。手順本体は
+  # plecto/build/manifest-render.sh。テンプレート編集後は run --rm でこのジョブを再実行 → HUP
+  plecto-manifest-render:
+    image: alpine:3.22
+    entrypoint: ["/bin/sh", "/job/manifest-render.sh"]
+    volumes:
+      - ./plecto/build:/job:ro
+      - ./plecto/manifest.tmpl.toml:/in/manifest.tmpl.toml:ro
+      - plecto-runtime:/out
+    secrets:
+      - session_hmac_key
+    depends_on:
+      plecto-filters-build:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # エッジ: TLS 終端、HTTP/1·2·3、ルーティング + WASM フィルタ(Phase 2: セッション認証 +
+  # レート制限 — plecto/manifest.tmpl.toml)。設定一式(manifest / filters / keys)は
+  # plecto-runtime volume に one-shot ジョブ群が組み立てたものを ro で読む。
   # upstream が落ちていても 503 で立ち続けるので upstream への depends_on は張らない(エッジは独立)。
   # 公式イメージ(ghcr.io/kaikei-e/plecto)固定 — ADR00005 の Revisit Trigger(公式イメージ配布)
   # が発火したためソースビルドから移行。タグは可変なので digest も併記して pin する。
@@ -47,10 +89,15 @@ services:
       - "443:443/udp" # HTTP/3 (QUIC)
       - "127.0.0.1:9099:9099" # admin (/metrics /healthz /readyz) — ホストローカルのみ
     volumes:
-      - ./plecto:/run/plecto:ro # manifest.toml(+ Phase 2 以降の filters/)
-      - plecto-certs:/run/plecto/certs # 自己署名証明書(plecto-certs-init が生成)
+      # レンダリング済み manifest + 署名済みフィルタ + trust 公開鍵(one-shot ジョブ群が生成)
+      - plecto-runtime:/run/plecto:ro
+      # 自己署名証明書(plecto-certs-init が生成)。mountpoint の certs/ ディレクトリは
+      # plecto-manifest-render が volume 内に掘っておく(ro マウント内 mkdir 失敗の罠対策)
+      - plecto-certs:/run/plecto/certs
     depends_on:
       plecto-certs-init:
+        condition: service_completed_successfully
+      plecto-manifest-render:
         condition: service_completed_successfully
     # healthcheck 無し: 公式イメージは distroless で curl もシェルも無く、plecto CLI にも
     # moka-core の `moka healthz` に相当する自己プローブ用サブコマンドが無い(validate/schema/
@@ -65,8 +112,15 @@ services:
       DATABASE_URL: postgres://moka@db:5432/moka?sslmode=disable
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       LLM_BASE_URL: http://llm:8081/v1
+      # セッション署名鍵(ADR00021)。Plecto の session-auth フィルタと同じ鍵を共有
+      # (鍵バイト列 = ファイル内容 trim 後の UTF-8、hex デコードしない)。
+      # 未配線でも auth エンドポイントが 503 になるだけで他は動く(フェイルソフト)
+      SESSION_HMAC_KEY_FILE: /run/secrets/session_hmac_key
+      # WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN は既定(localhost / https://localhost)。
+      # Tunnel や実ドメイン公開時はここで上書き必須(登録後の変更は既存パスキーを無効化する)
     secrets:
       - postgres_password
+      - session_hmac_key
     depends_on:
       db:
         condition: service_healthy
@@ -159,29 +213,44 @@ services:
       - video
       - "992" # render(コンテナ /etc/group に render が無いのでホストの GID 数値で。getent group render)
     environment:
-      LLAMA_CACHE: /models # -hf の自動 DL 先を bind mount へ
-    # 高速パス: Qwen3.5-4B Q4_K_M(品質A/BでLFM2.5に p=0.043 で勝ち・実効2.2倍速、ADR00007)。
-    # thinking はリクエスト側 chat_template_kwargs {"enable_thinking": false} で無効化する。
-    # 提案層・集約層のモデルは M1 以降で編成
+      LLAMA_CACHE: /models # preset の hf キーの自動 DL 先を bind mount へ
+    # router mode(ADR00020): モデル編成は llm/models-preset.ini が単一ソース
+    # (高速パス Qwen3.5-4B / Embedding Qwen3-Embedding-0.6B / 集約層 gpt-oss-20B の3枚常駐)。
+    # --models-max 3 超過時は LRU 退避 — 小さいGPUでも縮退して動く(OSS利用者への配慮)
     command: >-
-      -hf unsloth/Qwen3.5-4B-GGUF:Q4_K_M
-      --host 0.0.0.0 --port 8081 -ngl 99 -c 8192
+      --models-preset /models-preset.ini --models-max 3
+      --host 0.0.0.0 --port 8081
     ports:
       - "127.0.0.1:8081:8081" # eval/ とデバッグ用
     volumes:
       - ./models:/models
+      - ./llm/models-preset.ini:/models-preset.ini:ro
     healthcheck:
+      # router mode の /health は「router 生存」のみ即 200 を返す(モデルDL/ロードは背景で進む)。
+      # これにより --wait がモデルDLでブロックされる問題(旧・未決事項)は解消。
+      # モデル別の状態は GET /models の status で見る
       test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
       interval: 30s
-      start_period: 20m # 初回はモデル自動 DL(~2.5GB)+ロードで長い
+      start_period: 2m
       start_interval: 5s
 
 volumes:
   plecto-certs:
+  plecto-runtime: # レンダリング済み manifest + 署名済みフィルタ一式(one-shot ジョブ群が組み立て)
+  plecto-build-cache: # cargo registry / target / wasm-tools のキャッシュ(2回目以降のビルド高速化)
   db-data:
 
 # 機微情報はファイルベース secret で渡す(環境変数直書き禁止)。
-# 初回のみ: secrets/README.md の手順で postgres_password.txt を作る(gitignore 済み)
+# 初回のみ: secrets/README.md の手順で postgres_password.txt / session_hmac_key.txt /
+# plecto_filter_signing_key.pem を作る(いずれも gitignore 済み)
 secrets:
   postgres_password:
     file: ./secrets/postgres_password.txt
+  # セッション署名 cookie の共有シークレット(ADR00021)。moka-core(cookie 発行)と
+  # plecto の session-auth フィルタ(検証、plecto-manifest-render 経由)が同じ値を読む
+  session_hmac_key:
+    file: ./secrets/session_hmac_key.txt
+  # WASM フィルタの dev 署名鍵(ECDSA P-256)。公開鍵は plecto-filters-build が導出して
+  # manifest の [trust] へ。Phase 4(OCI 配布 + cosign 署名)で本番署名系に置き換える予定
+  plecto_filter_signing_key:
+    file: ./secrets/plecto_filter_signing_key.pem

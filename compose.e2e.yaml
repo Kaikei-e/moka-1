@@ -20,6 +20,14 @@ services:
       # enrich.Scheduler の pending 判定ポーリング間隔も同様に短縮(既定15秒だと
       # enrich_e2e.sh のポーリング待ちが長くなりすぎる)
       MOKA_ENRICH_TICK_SECONDS: "2"
+      # Playwright は http://localhost:3000 直で開く(Plecto/TLS を経由しない)ため、
+      # WebAuthn の origin 検査を既定(https://localhost、compose.yaml)から合わせる。
+      # これが無いと register/finish / login/finish の clientDataJSON 検証が必ず 400 になる。
+      # RP ID は既定と同じ localhost だが、origin とペアの契約なので明示しておく。
+      # セッション署名鍵(SESSION_HMAC_KEY_FILE + secrets: session_hmac_key)は
+      # ベースの compose.yaml の定義をそのまま継承する(secrets/session_hmac_key.txt が必要)
+      WEBAUTHN_ORIGIN: http://localhost:3000
+      WEBAUTHN_RP_ID: localhost
     depends_on:
       e2e-db:
         condition: service_healthy
