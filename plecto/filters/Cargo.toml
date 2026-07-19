@@ -1,0 +1,22 @@
+# moka-1 エッジの WASM フィルタ群(Plecto ドッグフーディング Phase 2、tenets §3.5)。
+# 各メンバーは plecto:filter@0.3.0(header-only の filter world、wit/ に vendor)を実装する
+# cdylib で、wasm32-unknown-unknown 向けにビルドし wasm-tools component new で component 化する
+# (Plecto docs/writing-a-filter.md §3 — wasi:* import ゼロが必須、deny-by-default)。
+# 判定ロジックは host API 非依存の純関数に切り出し、native `cargo test` で回す(tdd-workflow)。
+[workspace]
+resolver = "3"
+members = ["session-auth", "ratelimit"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+wit-bindgen = "0.59"
+
+# サイズ最適化(bp-rust-wasm §3)。エッジのホットパスに載る component なので小さく保つ
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

@@ -1,0 +1,124 @@
+# moka-1 エッジ manifest テンプレート — Plecto ドッグフーディング Phase 2(tenets §3.5)
+# TLS 終端 + ルーティングに WASM フィルタ第1弾(セッション認証 + レート制限)が載った。
+#
+# これは **テンプレート**であり、plecto が読むのはレンダリング済みの manifest.toml
+# (plecto-runtime volume 内、one-shot ジョブ plecto-manifest-render が生成)。
+# プレースホルダ(ダブルアンダースコア囲み)はレンダリング時に置換される:
+#   SESSION_HMAC_KEY   … Docker secret session_hmac_key(ADR00021 の共有シークレット。
+#                        [filter.config] にファイル間接参照が無いための橋渡し — draft_0004)
+#   SESSION_AUTH_DIGEST / RATELIMIT_DIGEST
+#                      … plecto-filters-build が生成した署名済み OCI layout の digest pin
+#
+# パスはすべて manifest 相対 = plecto-runtime volume(コンテナ内 /run/plecto)相対。
+# certs/ は Phase 1 と同じく plecto-certs volume が上書きされる(plecto-certs-init が生成)。
+# filters/ と keys/ は plecto-filters-build が生成する。
+#
+# 編集後の反映:
+#   docker compose run --rm plecto-manifest-render && docker compose kill -s HUP plecto
+# (壊れた編集は fail-closed で無視され旧構成が生き続ける。フィルタ本体を変えた場合は
+#  先に docker compose run --rm plecto-filters-build。[trust] の変更だけはリロード不可で
+#  plecto の再起動が必要 — trust は構築時固定)
+
+# データプレーンの bind アドレス。CLI 引数を廃し manifest を単一ソースにする
+# (Plecto field report §3.2 で解決 — 公式イメージは CMD にこのファイルのパスしか渡さない)
+[listen]
+addr = "0.0.0.0:443"
+
+[observability]
+# /metrics /healthz /readyz — compose 側で 127.0.0.1 のみに公開
+admin_addr = "0.0.0.0:9099"
+access_log = true
+
+# 開発用自己署名証明書。[[tls]] が 1 枚でもあると同一ポートで HTTP/1.1・HTTP/2(TCP)+ HTTP/3(QUIC/UDP)が有効になる
+[[tls]]
+cert_path = "certs/moka.crt"
+key_path = "certs/moka.key"
+
+# ---- trust(フィルタ署名の信頼root)----
+# plecto-filters-build が Docker secret の dev 署名鍵(ECDSA P-256)から導出した公開鍵。
+# 署名がこの鍵で検証できないフィルタはロードされない(fail-closed、Plecto ADR 000006)。
+# 注意: [trust] の変更は SIGHUP リロード不可(plecto 再起動が必要)
+[trust]
+keys = ["keys/filter-signer.pub"]
+
+# ---- filters(WASM、plecto-filters-build が署名済み OCI layout を生成)----
+# いずれも自前ビルド・自前署名なので isolation = "trusted"(プール実行、ホットパス高速)。
+# session-auth は必須 config(hmac_key)を init で検証するため trusted が前提でもある
+# (ロード時に fail-closed で発覚する — Plecto ADR 000066)
+
+# セッション認証(ADR00021): moka-core が発行した HMAC 署名 cookie の検証のみ。
+# 失敗時は text/html な GET → 302 /auth/login、それ以外 → 401(Fail-closed)
+[[filter]]
+id = "session-auth"
+source = "filters/session-auth"
+digest = "__SESSION_AUTH_DIGEST__"
+isolation = "trusted"
+[filter.config]
+hmac_key = "__SESSION_HMAC_KEY__"
+# cookie 名を変える場合はここで(既定 moka_session。moka-core 側と揃えること):
+# session_cookie = "moka_session"
+
+# レート制限(全経路): x-real-ip(ホストが偽装不能に再発行)per-IP のトークンバケット。
+# バケット仕様はフィルタ 1 枚 = 1 種なので、別レートは同じ wasm の別 id 登録で実現する
+[[filter]]
+id = "ratelimit"
+source = "filters/ratelimit"
+digest = "__RATELIMIT_DIGEST__"
+isolation = "trusted"
+# 通常閲覧向け: 燃料 100、毎秒 50 補充(SSR ページ + アセット + BFF 呼び出しを許容)
+ratelimit = { capacity = 100, refill_tokens = 50, refill_interval_ms = 1000 }
+
+# レート制限(ログイン経路): 同じ wasm を別 id で登録し、厳しめのバケットを与える。
+# パスキーの儀式(登録・ログイン)は毎秒 1 回 + バースト 10 で十分
+[[filter]]
+id = "ratelimit-auth"
+source = "filters/ratelimit"
+digest = "__RATELIMIT_DIGEST__"
+isolation = "trusted"
+ratelimit = { capacity = 10, refill_tokens = 1, refill_interval_ms = 1000 }
+
+# ---- upstreams(アドレスは compose のサービス名。upstream へは平文 HTTP/1.1)----
+# 契約: 各サービスは GET /healthz に 200 を返すこと。インスタンスは unhealthy から始まり、
+# プローブが通るまでルーティングに入らない(Plecto ADR 000017)。
+# moka-core / moka-web が未実装の間は 503 を返すのが正常(エッジは単独で立つ)。
+
+[[upstream]]
+name = "moka-core"
+addresses = ["moka-core:8080"]
+[upstream.health]
+path = "/healthz"
+
+[[upstream]]
+name = "moka-web"
+addresses = ["moka-web:3000"]
+[upstream.health]
+path = "/healthz"
+
+# ---- routes(最長 path_prefix が勝つ)----
+
+# /api はエッジに公開しない(ADR00011: ブラウザ経路は moka-web の BFF のみ。
+# BFF → moka-core は compose 内部ネットワーク直通なのでエッジ経由の /api は使われない)。
+# moka-core upstream の定義はヘルス監視のため残す。再公開時の契約: /api prefix は
+# strip しない(moka-core 側が /api/... で受ける — ADR00010)
+
+# 認証の儀式(パスキー登録・ログイン画面と BFF 経由の /auth API)。session-auth は
+# 掛けない(未認証者の入口)が、厳しめのレート制限で総当たりを抑える(ADR00021)
+[[route]]
+upstream = "moka-web"
+filters = ["ratelimit-auth"]
+[route.match]
+path_prefix = "/auth"
+
+# upstream 契約の /healthz は認証対象から除外(ADR00021)。レート制限のみ掛ける
+[[route]]
+upstream = "moka-web"
+filters = ["ratelimit"]
+[route.match]
+path_prefix = "/healthz"
+
+# それ以外すべて(読むための UI): レート制限 → セッション認証の順で通す
+[[route]]
+upstream = "moka-web"
+filters = ["ratelimit", "session-auth"]
+[route.match]
+path_prefix = "/"
