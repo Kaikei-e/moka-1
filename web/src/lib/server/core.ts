@@ -6,6 +6,7 @@ import {
 	articlesResponseSchema,
 	feedsResponseSchema,
 	fullTextResponseSchema,
+	passkeysResponseSchema,
 	registerResponseSchema,
 	searchResponseSchema,
 	summaryResponseSchema,
@@ -13,6 +14,7 @@ import {
 	type Article,
 	type Feed,
 	type FullText,
+	type Passkey,
 	type SearchResult,
 	type Summary
 } from '$lib/api/schemas';
@@ -89,6 +91,40 @@ export async function deleteFeed(fetchFn: typeof fetch, id: number): Promise<Del
 		status: res.status,
 		message: deleteFeedErrorMessages[res.status] ?? '削除に失敗しました。再試行してください'
 	};
+}
+
+export async function listPasskeys(fetchFn: typeof fetch): Promise<Passkey[]> {
+	const res = await fetchFn(`${baseURL()}/api/v1/auth/passkeys`);
+	if (!res.ok) throw new Error(`moka-core list passkeys: ${res.status}`);
+	return passkeysResponseSchema.parse(await res.json()).passkeys;
+}
+
+export type DeletePasskeyResult = { ok: true } | { ok: false; status: number; message: string };
+
+// moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)
+const deletePasskeyErrorMessages: Record<number, string> = {
+	404: 'パスキーが見つかりません。再読み込みしてください'
+};
+
+// パスキーの削除(ハード削除、ADR00019 と同じ流儀)。204 のみ成功
+export async function deletePasskey(
+	fetchFn: typeof fetch,
+	id: number
+): Promise<DeletePasskeyResult> {
+	const res = await fetchFn(`${baseURL()}/api/v1/auth/passkeys/${id}`, { method: 'DELETE' });
+	if (res.status === 204) return { ok: true };
+	return {
+		ok: false,
+		status: res.status,
+		message: deletePasskeyErrorMessages[res.status] ?? '削除に失敗しました。再試行してください'
+	};
+}
+
+// ログアウト(ADR00021)。moka-core はセッションストアを持たないステートレス設計なので
+// 失敗しない — 常に cookie を失効させる Set-Cookie 付きで 200 を返す。中身は解釈せず
+// relayAuthResponse でそのままブラウザへ中継する(ceremony と同じ作法)
+export async function postLogout(fetchFn: typeof fetch): Promise<Response> {
+	return fetchFn(`${baseURL()}/api/v1/auth/logout`, { method: 'POST' });
 }
 
 // moka-core のエラーステータス → moka の声(事実 + 次の行動、謝罪しない)

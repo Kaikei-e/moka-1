@@ -60,3 +60,18 @@ export const DELETE_CONFIRM_LABEL = '削除の確認';
 export const DELETE_FEED_WARNING =
 	'このフィードを削除すると、届いた記事・要約・既読の記録もすべて消えます。元に戻せません';
 export const DELETED = '削除しました';
+
+// アカウント(/account、ADR00021)。パスキー管理とログアウト。削除は破壊的なので
+// 警告様式(§2.4)の二段確認を挟む(DELETE_CONFIRM_LABEL / DELETE_CANCEL はフィードと共用)
+export const ACCOUNT_TITLE = 'アカウント';
+export const PASSKEYS_HEADING = 'パスキー';
+export const PASSKEYS_UNAVAILABLE = 'パスキーを読み込めませんでした。再読み込みしてください';
+export const PASSKEY_NEVER_USED = '未使用';
+export const DELETE_PASSKEY = '削除する';
+export const DELETE_PASSKEY_WARNING =
+	'このパスキーは今後ログインに使えなくなります。元に戻せません';
+export const DELETE_LAST_PASSKEY_WARNING =
+	'これが最後のパスキーです。削除すると、次に開いたときは誰でも新しいパスキーを登録できるようになります';
+export const LOGOUT = 'ログアウト';
+export const LOGGING_OUT = 'ログアウトしています';
+export const LOGOUT_FAILED = 'ログアウトに失敗しました。再試行してください';

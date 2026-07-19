@@ -87,6 +87,16 @@ export const articlesResponseSchema = z.object({
 });
 export const articleResponseSchema = z.object({ article: articleSchema });
 export const feedsResponseSchema = z.object({ feeds: z.array(feedSchema) });
+
+// パスキー管理(ADR00021)。DB 行 id(削除 API の引数)+ 利用状況。last_used_at は
+// 登録後一度もログインで使われていなければ null(登録自体はイベントを積まない)
+export const passkeySchema = z.object({
+	id: z.number(),
+	created_at: z.string(),
+	last_used_at: z.string().nullable()
+});
+
+export const passkeysResponseSchema = z.object({ passkeys: z.array(passkeySchema) });
 export const registerResponseSchema = z.object({
 	feed: feedSchema,
 	inserted_articles: z.number()
@@ -102,3 +112,4 @@ export type FullText = z.infer<typeof fullTextSchema>;
 export type Summary = z.infer<typeof summarySchema>;
 export type Tags = z.infer<typeof tagsSchema>;
 export type SearchResult = z.infer<typeof searchResultSchema>;
+export type Passkey = z.infer<typeof passkeySchema>;

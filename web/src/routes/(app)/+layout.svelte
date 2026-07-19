@@ -59,6 +59,7 @@
 				{#if menuOpen}
 					<div class="popover" role="menu">
 						<a role="menuitem" class="popover-item" href={resolve('/feeds')}>フィード管理</a>
+						<a role="menuitem" class="popover-item" href={resolve('/account')}>アカウント</a>
 					</div>
 				{/if}
 			</div>
@@ -69,6 +70,7 @@
 		<div class="sidebar-head">
 			<a class="brand" href={resolve('/')}>moka-1</a>
 			<a class="feeds-link" href={resolve('/feeds')}>フィード管理</a>
+			<a class="feeds-link" href={resolve('/account')}>アカウント</a>
 		</div>
 		{#if data.listUnavailable}
 			<p class="side-note">{LIST_UNAVAILABLE}</p>

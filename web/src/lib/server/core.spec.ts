@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
 	askArticleStream,
 	deleteFeed,
+	deletePasskey,
 	fetchFullText,
 	getArticle,
 	getSummary,
 	getTags,
 	listArticlesPage,
 	listFeeds,
+	listPasskeys,
 	markArticleRead,
+	postLogout,
 	registerFeed,
 	searchArticles,
 	summarizeArticle,
@@ -216,6 +219,69 @@ describe('deleteFeed', () => {
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await deleteFeed(statusStub(status), 1);
 		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+const passkey = {
+	id: 1,
+	created_at: '2026-07-19T00:00:00Z',
+	last_used_at: null
+};
+
+describe('listPasskeys', () => {
+	it('returns the passkeys array', async () => {
+		const got = await listPasskeys(fetchStub(200, { passkeys: [passkey] }));
+		expect(got).toEqual([passkey]);
+	});
+});
+
+describe('deletePasskey', () => {
+	function statusStub(status: number, capture?: { url?: string; method?: string }): typeof fetch {
+		return async (input, init) => {
+			if (capture) {
+				capture.url = String(input);
+				capture.method = init?.method ?? '';
+			}
+			return new Response(null, { status });
+		};
+	}
+
+	it('DELETEs the passkey and maps 204 to ok', async () => {
+		const capture: { url?: string; method?: string } = {};
+		const got = await deletePasskey(statusStub(204, capture), 1);
+
+		expect(got).toEqual({ ok: true });
+		expect(capture.url).toMatch(/\/api\/v1\/auth\/passkeys\/1$/);
+		expect(capture.method).toBe('DELETE');
+	});
+
+	it.each([
+		[404, 'パスキーが見つかりません。再読み込みしてください'],
+		[500, '削除に失敗しました。再試行してください'],
+		[502, '削除に失敗しました。再試行してください']
+	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
+		const got = await deletePasskey(statusStub(status), 1);
+		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('postLogout', () => {
+	it('POSTs to the logout endpoint', async () => {
+		const capture: { url?: string; method?: string } = {};
+		const stub: typeof fetch = async (input, init) => {
+			capture.url = String(input);
+			capture.method = init?.method ?? '';
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		};
+
+		const res = await postLogout(stub);
+
+		expect(res.status).toBe(200);
+		expect(capture.url).toMatch(/\/api\/v1\/auth\/logout$/);
+		expect(capture.method).toBe('POST');
 	});
 });
 
