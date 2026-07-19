@@ -7,21 +7,24 @@ description: Rust ベストプラクティス(Plecto WASM フィルタ向け、E
 
 # Rust Best Practices (Plecto WASM Filters)
 
-moka-1 の Rust は**サーバーではなく WASM Component Model フィルタ**(`plecto:filter@0.1.0` WIT コントラクト実装)。
+moka-1 の Rust は**サーバーではなく WASM Component Model フィルタ**(`plecto:filter@0.3.0` WIT コントラクト実装 — 契約バージョンは Plecto 本体と独立採番)。
 Alt の tokio サーバー規約とは別物。ここでの失敗・不便はドッグフーディングの成果物 — 回避策で黙って進めず Plecto に issue/ADR を起票する(tenets §3.5)。
 
-## ツールチェーン(2026 年時点の正解)
+## ツールチェーン(Plecto 0.4.2 実測 — Phase 2 実装 2026-07-19 で確定)
 
-1. **plain cargo + `wasm32-wasip2` ターゲット**: Rust 1.82+ で upstream 化済み。**cargo-component は非推奨化が進行中なので新規では使わない**
+1. **`wasm32-unknown-unknown` + `wasm-tools component new` の2段構え**(Plecto docs/writing-a-filter.md の公式手順。**wasip2 ではない** — Tier A フィルタは zero-WASI で、`wasi:*` import が1つでもあるとロード拒否される)。cargo-component も使わない:
    ```bash
-   rustup target add wasm32-wasip2
-   cargo build --target wasm32-wasip2 --release   # そのままコンポーネントが出る
+   rustup target add wasm32-unknown-unknown
+   cargo build --target wasm32-unknown-unknown --release
+   wasm-tools component new target/wasm32-unknown-unknown/release/<name>.wasm -o <name>.component.wasm
+   wasm-tools component wit <name>.component.wasm   # import が plecto:filter/* のみか確認
    ```
-2. **バインディングは `wit-bindgen` の `generate!` マクロ**: WIT は Plecto 本体の `wit/` を参照(コピーしない。バージョンずれ検出のため path/OCI 参照で一元化)
+   moka-1 では `plecto/build/filters-build.sh`(one-shot ジョブ)がこの手順の単一ソース。
+2. **バインディングは `wit-bindgen`(0.59系)の `generate!` マクロ**: WIT は `wkg get plecto:filter@0.3.0`(ghcr.io / prefix `kaikei-e/wit/`)で取得し `plecto/filters/wit/` に vendor(リリースノートの digest と照合してから使う):
    ```rust
-   wit_bindgen::generate!({ world: "filter", path: "../../wit" });
+   wit_bindgen::generate!({ world: "filter", path: "wit" });
    ```
-3. **Cargo.toml**: `edition = "2024"`, `crate-type = ["cdylib"]`。リリースプロファイルはサイズ最適化:
+3. **Cargo.toml**: `edition = "2024"`, `crate-type = ["cdylib"]`, 自前 `[workspace]` 宣言(親 workspace に吸収させない)。リリースプロファイルはサイズ最適化:
    ```toml
    [profile.release]
    opt-level = "s"
@@ -57,11 +60,11 @@ Alt の tokio サーバー規約とは別物。ここでの失敗・不便はド
 
 17. **ロジックは native でユニットテスト**: 判定ロジックを host API 非依存の純関数(`&HeaderMap -> Verdict` 的シグネチャ)に切り出し、`cargo test`(ホスト native)で回す。host API はトレイトで抽象化してフェイクを注入
 18. **境界は E2E で**: WIT 越しの実挙動は Plecto ホストに実際にロードして Hurl で検証(tdd-workflow の `e2e/hurl/edge/`)。wasmtime を使った自前ハーネスは作らない(Plecto のカンフォーマンステストに寄せる)
-19. **CI パリティ**: `cargo fmt --check && cargo clippy --target wasm32-wasip2 -- -D warnings && cargo test && cargo build --target wasm32-wasip2 --release`
+19. **CI パリティ**: `cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo clippy --target wasm32-unknown-unknown --release -- -D warnings && cargo test && cargo build --target wasm32-unknown-unknown --release`
 
-## 配布(M4 以降)
+## 配布(Phase 2 で前倒し確定)
 
-20. フィルタは OCI アーティファクト + cosign 署名 + SBOM で配布(Plecto M4 機能のドッグフーディング)。ローカル開発では compose のバインドマウント + SIGHUP ホットリロードで回す
+20. Plecto は**ローカルでも bare `.wasm` をロードしない** — 署名済み OCI image-layout + digest pin + `[trust]` 公開鍵が必須(fail-closed)。moka-1 では one-shot ジョブ2本(`plecto-filters-build` → `plecto-manifest-render`)がビルド〜署名〜manifest レンダリングを担い、反映は `docker compose run --rm` で両ジョブ再実行 → `docker compose kill -s HUP plecto`。GHCR への OCI 配布は Phase 4(tenets §3.5)
 
 ## 参照
 
