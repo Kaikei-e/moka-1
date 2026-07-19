@@ -63,3 +63,33 @@ GET {{host}}/api/v1/auth/status
 HTTP 200
 [Asserts]
 jsonpath "$.registered" == false
+
+# ---- パスキー管理・ログアウト(fresh DB で確認できる境界のみ。実資格情報を伴う
+# 一覧・削除の実地検証は儀式完走が要るため Playwright(08-account-passkeys.spec.ts)の領分)----
+
+# 7. 未登録 = 一覧は空配列
+GET {{host}}/api/v1/auth/passkeys
+HTTP 200
+[Asserts]
+jsonpath "$.passkeys" count == 0
+
+# 8. 数値でない id での削除は 400
+DELETE {{host}}/api/v1/auth/passkeys/not-a-number
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "invalid passkey id"
+
+# 9. 存在しない id での削除は 404(未登録状態でも同じ写像)
+DELETE {{host}}/api/v1/auth/passkeys/999999
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "passkey not found"
+
+# 10. ログアウトはセッションの有無に関わらず 200(ステートレス — ADR00021)。
+# 常に cookie を失効させる Set-Cookie を返す(ブラウザは Max-Age=0 で即座に破棄する)
+POST {{host}}/api/v1/auth/logout
+HTTP 200
+[Asserts]
+jsonpath "$.ok" == true
+header "Set-Cookie" contains "moka_session="
+header "Set-Cookie" contains "Max-Age=0"
