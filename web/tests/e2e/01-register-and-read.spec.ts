@@ -40,11 +40,17 @@ test('記事を選ぶと読書ビューが開き、moka の要約が運ばれて
 		'true'
 	);
 
-	// 要約カード: 明示ボタンのみが引き金(全文取り寄せと同じ作法、自動生成しない)。
-	// 存在と形をアサートし、生成内容の文言には依存しない
+	// 要約カード: enrich.Scheduler(常駐エージェントループ)がフィード登録直後から
+	// バックグラウンドで自動要約を回しているため、読書ビューを開いた時点で既に
+	// 濃縮済み(テキストがそのまま出る)か、まだ未濃縮(明示ボタンが出る)かは
+	// レースになる。存在と形をアサートし、生成内容の文言にもタイミングにも依存しない
 	await expect(page.getByText('moka による要約')).toBeVisible();
-	await page.getByRole('button', { name: '要約する' }).click();
 	const summaryText = page.getByTestId('summary-text');
+	const summarizeButton = page.getByRole('button', { name: '要約する' });
+	await expect(summaryText.or(summarizeButton)).toBeVisible({ timeout: 20_000 });
+	if (await summarizeButton.isVisible()) {
+		await summarizeButton.click();
+	}
 	await expect(summaryText).toBeVisible({ timeout: 20_000 });
 	await expect(summaryText).not.toHaveText('');
 
