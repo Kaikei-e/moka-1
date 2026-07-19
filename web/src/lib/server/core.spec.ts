@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	askArticleStream,
 	deleteFeed,
 	fetchFullText,
 	getArticle,
@@ -9,6 +10,7 @@ import {
 	listFeeds,
 	markArticleRead,
 	registerFeed,
+	searchArticles,
 	summarizeArticle,
 	summarizeArticleStream,
 	tagArticle
@@ -331,6 +333,69 @@ describe('tagArticle', () => {
 	])('maps %i to a quiet fact-plus-next-step message', async (status, message) => {
 		const got = await tagArticle(fetchStub(status, { error: 'x' }), 7);
 		expect(got).toEqual({ ok: false, status, message });
+	});
+});
+
+describe('searchArticles', () => {
+	const searchResult = { ...article, score: 0.42 };
+
+	it('parses the items envelope (same article representation plus a score)', async () => {
+		const got = await searchArticles(fetchStub(200, { items: [searchResult] }), 'seven');
+		expect(got).toHaveLength(1);
+		expect(got[0]?.title).toBe('Seven');
+		expect(got[0]?.score).toBe(0.42);
+	});
+
+	it('requests /api/v1/search with the query and limit', async () => {
+		let requestedUrl = '';
+		const fetchFn: typeof fetch = async (input) => {
+			requestedUrl = String(input);
+			return new Response(JSON.stringify({ items: [] }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		};
+
+		await searchArticles(fetchFn, '瑠璃', 20);
+
+		expect(requestedUrl).toContain('/api/v1/search');
+		expect(requestedUrl).toContain(`q=${encodeURIComponent('瑠璃')}`);
+		expect(requestedUrl).toContain('limit=20');
+	});
+
+	it('rejects a result missing the score (contract drift guard)', async () => {
+		await expect(searchArticles(fetchStub(200, { items: [article] }), 'seven')).rejects.toThrow();
+	});
+
+	it('rejects on a non-200 status', async () => {
+		await expect(
+			searchArticles(fetchStub(500, { error: 'internal error' }), 'x')
+		).rejects.toThrow();
+	});
+});
+
+describe('askArticleStream', () => {
+	it('POSTs the question as JSON and returns the raw upstream response (pass-through)', async () => {
+		let gotUrl = '';
+		let gotMethod = '';
+		let gotBody = '';
+		const fetchFn: typeof fetch = async (input, init) => {
+			gotUrl = String(input);
+			gotMethod = init?.method ?? '';
+			gotBody = String(init?.body);
+			return new Response('event: delta\ndata: {"text":"答え"}\n\n', {
+				status: 200,
+				headers: { 'Content-Type': 'text/event-stream' }
+			});
+		};
+
+		const res = await askArticleStream(fetchFn, 7, 'この記事の背景は');
+
+		expect(gotMethod).toBe('POST');
+		expect(gotUrl).toMatch(/\/api\/v1\/articles\/7\/qa$/);
+		expect(JSON.parse(gotBody)).toEqual({ question: 'この記事の背景は' });
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe('event: delta\ndata: {"text":"答え"}\n\n');
 	});
 });
 

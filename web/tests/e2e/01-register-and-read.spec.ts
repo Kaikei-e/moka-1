@@ -48,9 +48,10 @@ test('記事を選ぶと読書ビューが開き、moka の要約が運ばれて
 	await expect(summaryText).toBeVisible({ timeout: 20_000 });
 	await expect(summaryText).not.toHaveText('');
 
-	// 対訳と訊く(AskBar)は LLM 実装まで取り下げ中 — 読書ビューには現れない
+	// 対訳は LLM 翻訳の実装まで取り下げ中 — 読書ビューには現れない
 	await expect(page.getByRole('button', { name: '対訳' })).not.toBeVisible();
-	await expect(page.getByPlaceholder('この記事について訊く…')).not.toBeVisible();
+	// 訊く(問い返し)の入力バーは読書ビューに常設(M2)
+	await expect(page.getByPlaceholder('この記事について訊く…')).toBeVisible();
 });
 
 test('読書ビューで全文を取り寄せると本文が置き換わり、原文は新しいタブで開く', async ({ page }) => {

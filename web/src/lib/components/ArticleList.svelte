@@ -85,7 +85,7 @@
 			{#each listItems as item (item.id)}
 				<li>
 					<a
-						href={resolve('/articles/[id]', { id: String(item.id) })}
+						href={resolve('/(app)/articles/[id]', { id: String(item.id) })}
 						aria-current={item.id === currentId ? 'page' : undefined}
 						data-read={item.read || readOverrides.has(item.id) ? 'true' : undefined}
 					>

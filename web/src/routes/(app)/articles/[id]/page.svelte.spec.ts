@@ -348,13 +348,13 @@ describe('articles/[id] reading view — 既読打刻(fire-and-forget)', () => {
 	});
 });
 
-describe('articles/[id] reading view — 取り下げ中の UI(対訳・訊く)', () => {
-	it('renders neither the 対訳 toggle nor the ask bar until the LLM backend exists', async () => {
+describe('articles/[id] reading view — 対訳は取り下げ中、訊くは常設(M2)', () => {
+	it('renders the ask bar but not the 対訳 toggle (翻訳は LLM 実装まで取り下げ中)', async () => {
 		vi.stubGlobal('fetch', routeFetch());
 		render(Page, { data: pageData });
 
 		await expect.element(page.getByRole('heading', { name: 'Seven' })).toBeVisible();
 		expect(page.getByRole('button', { name: '対訳' }).elements()).toHaveLength(0);
-		expect(page.getByPlaceholder('この記事について訊く…').elements()).toHaveLength(0);
+		await expect.element(page.getByPlaceholder('この記事について訊く…')).toBeVisible();
 	});
 });

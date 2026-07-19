@@ -1,7 +1,7 @@
 <script lang="ts">
-	// 読書ビュー: 本文(記事の声 = 明朝)が主役。AI 要素(要約)は給仕として従属する。
-	// 流れは タイトル → メタ → 要約カード → 本文 → 全文を取り寄せる、の一本(v3.3.0)。
-	// 対訳と訊く(AskBar)は LLM 実装まで取り下げ中 — コンポーネントと規定は保持している。
+	// 読書ビュー: 本文(記事の声 = 明朝)が主役。AI 要素(要約・問い返し)は給仕として従属する。
+	// 流れは タイトル → メタ → 要約カード → 本文 → 全文を取り寄せる → 訊く、の一本。
+	// 対訳は LLM 翻訳の実装まで取り下げ中 — コンポーネントと規定は保持している。
 	//
 	// 全文取り寄せ: 明示ボタンのみが引き金(自動取得しない)。取得済みなら本文を置き換える。
 	// 冪等(サーバー側で保存済みなら再取得しない)なので、成功後はボタンごと消して再クリックを防ぐ。
@@ -12,6 +12,7 @@
 	// SvelteKit は同一ルート(/articles/[id])内の遷移でこのコンポーネントインスタンスを
 	// 再利用し、data だけ差し替える。取り寄せ状態は記事単位なので data.article.id の変化を
 	// 検知してリセットする(既読打刻も同じ契機で記事ごとに一度ずつ飛ぶ)。
+	import AskBar from '$lib/components/AskBar.svelte';
 	import DripIndicator from '$lib/components/DripIndicator.svelte';
 	import SummaryCard from '$lib/components/SummaryCard.svelte';
 	import TagList from '$lib/components/TagList.svelte';
@@ -101,7 +102,7 @@
 	{/if}
 
 	{#if fullText === null}
-		<footer class="fulltext-zone">
+		<div class="fulltext-zone">
 			{#if fetching}
 				<DripIndicator label={FETCHING_FULLTEXT} testid="fulltext-drip" />
 			{:else}
@@ -113,8 +114,13 @@
 					失敗: {fetchError}
 				</p>
 			{/if}
-		</footer>
+		</div>
 	{/if}
+
+	<!-- 訊く(問い返し): 読み終わりに置く。回答は AI 生成物として fujinezu 面に載る(§8.2) -->
+	<footer class="ask-zone">
+		<AskBar articleId={data.article.id} />
+	</footer>
 </article>
 
 <style>
@@ -145,6 +151,10 @@
 
 	/* 本文の後、静かな取り寄せ導線(本文が主役 — メタ行に混ぜず、読み終わりに置く) */
 	.fulltext-zone {
+		margin-top: 32px;
+	}
+	/* 訊くは読書の流れの最後。上との間はマージンのみ — 罫線は AskBar 側の質問区切りに任せる */
+	.ask-zone {
 		margin-top: 32px;
 	}
 	.fulltext-button {

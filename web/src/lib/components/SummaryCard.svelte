@@ -11,6 +11,7 @@
 	// articleId の変化を検知して状態をリセットする(記事ごとに確認からやり直す)。
 	import DripIndicator from './DripIndicator.svelte';
 	import { REGENERATE_SUMMARY, RETRY_SUMMARIZE, SUMMARIZE, SUMMARIZING } from '$lib/copy';
+	import { readSSEStream, type SSEFrame } from '$lib/sse';
 
 	let { articleId }: { articleId: number } = $props();
 
@@ -54,25 +55,19 @@
 		})();
 	});
 
-	// SSE の1イベント("event: foo\ndata: {...}"、\n\n区切り済み)を状態へ反映する。
-	// delta: 到着順に本文を連結して逐次表示。done: 保存済みの最終テキストで確定。
+	// SSE の1フレームを状態へ反映する。delta: 到着順に本文を連結して逐次表示。
+	// done: 保存済みの最終テキストで確定。
 	// error: 部分テキストは破棄して(moka-core 側も保存しない)失敗表示のみ残す。
-	function applySSEEvent(raw: string) {
-		let eventName = 'message';
-		let data = '';
-		for (const line of raw.split('\n')) {
-			if (line.startsWith('event: ')) eventName = line.slice('event: '.length);
-			else if (line.startsWith('data: ')) data = line.slice('data: '.length);
-		}
-		if (!data) return;
-		const payload = JSON.parse(data);
-		if (eventName === 'delta') {
+	function applySSEFrame(frame: SSEFrame) {
+		if (!frame.data) return;
+		const payload = JSON.parse(frame.data);
+		if (frame.event === 'delta') {
 			text = (text ?? '') + payload.text;
 			loading = false;
-		} else if (eventName === 'done') {
+		} else if (frame.event === 'done') {
 			text = payload.summary?.text ?? text ?? '';
 			loading = false;
-		} else if (eventName === 'error') {
+		} else if (frame.event === 'error') {
 			error = payload.error ?? '要約に失敗しました。再試行してください';
 			text = null;
 			loading = false;
@@ -98,24 +93,7 @@
 				return;
 			}
 
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = '';
-			for (;;) {
-				const { done, value } = await reader.read();
-				if (id !== articleId) {
-					void reader.cancel();
-					return;
-				}
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				let sep = buffer.indexOf('\n\n');
-				while (sep !== -1) {
-					applySSEEvent(buffer.slice(0, sep));
-					buffer = buffer.slice(sep + 2);
-					sep = buffer.indexOf('\n\n');
-				}
-			}
+			await readSSEStream(res.body, applySSEFrame, () => id === articleId);
 		} catch {
 			if (id !== articleId) return;
 			error = '要約に失敗しました。再試行してください';
