@@ -234,10 +234,12 @@
 	.article-html :global(code) {
 		font: 400 13px/1.7 var(--font-code);
 		color: var(--kon);
+		overflow-wrap: anywhere; /* 長いファイルパス・URL等の不可分文字列で横崩れさせない */
 	}
 	.article-html :global(pre code) {
 		background: none;
 		padding: 0;
+		overflow-wrap: normal; /* pre 側は overflow-x: auto で横スクロールさせるため折り返さない */
 	}
 	.article-html :global(p code),
 	.article-html :global(li code) {
