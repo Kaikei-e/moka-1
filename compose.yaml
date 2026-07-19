@@ -116,8 +116,11 @@ services:
       # (鍵バイト列 = ファイル内容 trim 後の UTF-8、hex デコードしない)。
       # 未配線でも auth エンドポイントが 503 になるだけで他は動く(フェイルソフト)
       SESSION_HMAC_KEY_FILE: /run/secrets/session_hmac_key
-      # WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN は既定(localhost / https://localhost)。
-      # Tunnel や実ドメイン公開時はここで上書き必須(登録後の変更は既存パスキーを無効化する)
+      # WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN(既定 localhost / https://localhost)。
+      # 実ドメイン公開時は .env(gitignore 済み)で上書き必須 — ここにドメインを書かない
+      # (登録後の変更は既存パスキーを無効化する)。未設定時の既定値は internal/auth 側で解決
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-}
     secrets:
       - postgres_password
       - session_hmac_key
