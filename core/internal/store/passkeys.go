@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
+
+	"github.com/Kaikei-e/moka-1/core/internal/auth"
 )
 
 // passkey_credentials / auth_assertions は INSERT-only(ADR00002/ADR00021)。
@@ -83,6 +86,51 @@ func (s *Store) InsertAuthAssertion(ctx context.Context, credentialID []byte, si
 		return fmt.Errorf("insert auth assertion: credential %x not found", credentialID)
 	}
 	return nil
+}
+
+// ListPasskeySummaries は管理画面向けの人間可読な一覧を返す(auth.CredentialStore)。
+// DB 行 id と、auth_assertions の最新イベント時刻(未使用なら NULL)を持つ。
+func (s *Store) ListPasskeySummaries(ctx context.Context) ([]auth.PasskeySummary, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT c.id, c.created_at,
+		        (SELECT a.asserted_at FROM auth_assertions a
+		         WHERE a.credential_id = c.id
+		         ORDER BY a.asserted_at DESC, a.id DESC LIMIT 1) AS last_used_at
+		 FROM passkey_credentials c
+		 ORDER BY c.id`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("select passkey summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []auth.PasskeySummary
+	for rows.Next() {
+		var (
+			id         int64
+			createdAt  time.Time
+			lastUsedAt *time.Time
+		)
+		if err := rows.Scan(&id, &createdAt, &lastUsedAt); err != nil {
+			return nil, fmt.Errorf("scan passkey summary: %w", err)
+		}
+		summaries = append(summaries, auth.PasskeySummary{ID: id, CreatedAt: createdAt, LastUsedAt: lastUsedAt})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate passkey summaries: %w", err)
+	}
+	return summaries, nil
+}
+
+// DeletePasskeyCredential は DB 行 id で資格情報を物理削除する(auth.CredentialStore)。
+// ハード削除 — ADR00019 と同じ流儀。auth_assertions は既存の FK ON DELETE CASCADE で
+// 一括して消える(passkey_credentials 自体は INSERT-only ではない — リソース、ADR00021)。
+func (s *Store) DeletePasskeyCredential(ctx context.Context, id int64) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM passkey_credentials WHERE id = $1`, id)
+	if err != nil {
+		return false, fmt.Errorf("delete passkey credential %d: %w", id, err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // passkeyMeta は webauthn.Credential の付帯情報を meta JSONB 用の JSON にする。

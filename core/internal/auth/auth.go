@@ -33,7 +33,22 @@ var (
 	// ErrCeremonyFailed は WebAuthn 応答のパース・検証失敗
 	// (登録 400 / ログイン 401 に写像)。
 	ErrCeremonyFailed = errors.New("webauthn ceremony failed")
+	// ErrPasskeyNotFound は存在しない id への削除要求(404)。
+	ErrPasskeyNotFound = errors.New("passkey not found")
 )
+
+// PasskeySummary はパスキー管理画面向けの人間可読な資格情報要約。webauthn.Credential
+// (WebAuthn 儀式が必要とする生の credential_id/公開鍵)とは別の型 — 管理 UI は
+// DB 行 id(削除 API のパス引数)と利用状況だけを見る。
+type PasskeySummary struct {
+	// ID は passkey_credentials の行 id(DELETE /api/v1/auth/passkeys/{id} の引数)。
+	ID int64 `json:"id"`
+	// CreatedAt は登録日時。
+	CreatedAt time.Time `json:"created_at"`
+	// LastUsedAt は auth_assertions の最新イベント時刻。登録後一度もログインで
+	// 使われていなければ nil(登録自体は assertion イベントを積まない — ADR00021)。
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
 
 // 単一ユーザー前提(ADR00021)の固定ユーザー。WebAuthn の user handle は
 // 資格情報に焼き込まれるので、この値は登録後に変えてはならない。
@@ -64,6 +79,12 @@ type CredentialStore interface {
 	// InsertAuthAssertion はログイン成功の事実(sign counter 込み)を追記する。
 	// credentialID は WebAuthn の credential ID(passkey_credentials.credential_id)。
 	InsertAuthAssertion(ctx context.Context, credentialID []byte, signCount uint32) error
+	// ListPasskeySummaries は管理画面向けの人間可読な一覧を返す(DB 行 id 込み)。
+	ListPasskeySummaries(ctx context.Context) ([]PasskeySummary, error)
+	// DeletePasskeyCredential は DB 行 id で資格情報を物理削除する(ハード削除 —
+	// ADR00019 と同じ流儀。auth_assertions は既存の FK CASCADE で一括して消える)。
+	// found が false なら該当行が無かった(呼び出し側は ErrPasskeyNotFound に写像する)。
+	DeletePasskeyCredential(ctx context.Context, id int64) (found bool, err error)
 }
 
 // Config は Service の設定。ゼロ値のフィールドには既定値が入る。
@@ -262,6 +283,44 @@ func (s *Service) FinishLogin(ctx context.Context, body io.Reader) (*http.Cookie
 		return nil, fmt.Errorf("insert auth assertion: %w", err)
 	}
 	return newSessionCookie(s.secret, s.now()), nil
+}
+
+// ListPasskeys は管理画面向けの登録済み資格情報一覧を返す。
+func (s *Service) ListPasskeys(ctx context.Context) ([]PasskeySummary, error) {
+	if s.disabled != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnavailable, s.disabled)
+	}
+	summaries, err := s.store.ListPasskeySummaries(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list passkey summaries: %w", err)
+	}
+	return summaries, nil
+}
+
+// DeletePasskey は id の資格情報をハード削除する(ADR00019 と同じ流儀 — CASCADE で
+// auth_assertions も一括して消える)。最後の1本を消すことも禁じない: パスキーが
+// 1本も無い状態はブートストラップを再び開く(ADR00021)ので、鍵を失っても
+// 自分自身で再登録して復旧できる — これは意図した回復経路であって事故ではない。
+func (s *Service) DeletePasskey(ctx context.Context, id int64) error {
+	if s.disabled != nil {
+		return fmt.Errorf("%w: %w", ErrUnavailable, s.disabled)
+	}
+	found, err := s.store.DeletePasskeyCredential(ctx, id)
+	if err != nil {
+		return fmt.Errorf("delete passkey %d: %w", id, err)
+	}
+	if !found {
+		return ErrPasskeyNotFound
+	}
+	s.logger.Info("passkey deleted", "id", id)
+	return nil
+}
+
+// Logout はセッション cookie を失効させる応答を返す。moka-core はセッションストアを
+// 持たないステートレス設計(ADR00021)なので、鍵が未設定(認証機能無効)でも動作する
+// — ブラウザが古い有効な cookie を持っていれば、それを消す義務は鍵の有無に関わらない。
+func (s *Service) Logout() *http.Cookie {
+	return clearSessionCookie()
 }
 
 // user は保存済み資格情報を束ねた固定ユーザーを返す(認証無効時は ErrUnavailable)。

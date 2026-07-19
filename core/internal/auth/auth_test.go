@@ -23,6 +23,12 @@ type fakeCredStore struct {
 	assertErr  error
 	inserted   []webauthn.Credential
 	assertions []assertionRecord
+
+	summaries    []PasskeySummary
+	summariesErr error
+	deleteErr    error
+	deletedIDs   []int64
+	deleteFound  map[int64]bool // 未設定キーは true 扱い(found)
 }
 
 type assertionRecord struct {
@@ -49,6 +55,24 @@ func (f *fakeCredStore) InsertAuthAssertion(_ context.Context, credentialID []by
 	}
 	f.assertions = append(f.assertions, assertionRecord{credentialID: credentialID, signCount: signCount})
 	return nil
+}
+
+func (f *fakeCredStore) ListPasskeySummaries(context.Context) ([]PasskeySummary, error) {
+	return f.summaries, f.summariesErr
+}
+
+func (f *fakeCredStore) DeletePasskeyCredential(_ context.Context, id int64) (bool, error) {
+	if f.deleteErr != nil {
+		return false, f.deleteErr
+	}
+	found := true
+	if f.deleteFound != nil {
+		found = f.deleteFound[id]
+	}
+	if found {
+		f.deletedIDs = append(f.deletedIDs, id)
+	}
+	return found, nil
 }
 
 // newTestService は test vector と同じ鍵の secret ファイルを作って Service を組み立てる。
@@ -107,6 +131,17 @@ func TestServiceUnavailable(t *testing.T) {
 		require.ErrorIs(t, err, ErrUnavailable)
 		_, err = svc.FinishLogin(t.Context(), bytes.NewReader(nil))
 		require.ErrorIs(t, err, ErrUnavailable)
+		_, err = svc.ListPasskeys(t.Context())
+		require.ErrorIs(t, err, ErrUnavailable)
+		err = svc.DeletePasskey(t.Context(), 1)
+		require.ErrorIs(t, err, ErrUnavailable)
+
+		// Logout だけは例外: セッションストアを持たないステートレス設計(ADR00021)なので、
+		// 鍵が無くても「ブラウザの cookie を消せ」という応答自体は返せる —
+		// クライアントが古い有効な cookie を持っていれば、それは消えるべきだから
+		cookie := svc.Logout()
+		require.Equal(t, SessionCookieName, cookie.Name)
+		require.Negative(t, cookie.MaxAge)
 	}
 
 	t.Run("unset secret file disables every auth method", func(t *testing.T) {
@@ -346,5 +381,86 @@ func TestServiceLogin(t *testing.T) {
 		// 同じ応答の再送(リプレイ)は begin し直さない限り拒否される
 		_, err = svc.FinishLogin(t.Context(), bytes.NewReader(body))
 		assert.ErrorIs(t, err, ErrNoCeremony)
+	})
+}
+
+func TestServiceListPasskeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns store summaries as-is", func(t *testing.T) {
+		t.Parallel()
+
+		want := []PasskeySummary{
+			{ID: 1, CreatedAt: time.Date(2026, 7, 19, 0, 0, 0, 0, time.UTC)},
+		}
+		svc := newTestService(t, &fakeCredStore{summaries: want}, nil)
+
+		got, err := svc.ListPasskeys(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("store failure propagates", func(t *testing.T) {
+		t.Parallel()
+
+		svc := newTestService(t, &fakeCredStore{summariesErr: assert.AnError}, nil)
+		_, err := svc.ListPasskeys(t.Context())
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestServiceDeletePasskey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("deletes an existing credential", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeCredStore{}
+		svc := newTestService(t, store, nil)
+
+		require.NoError(t, svc.DeletePasskey(t.Context(), 7))
+		assert.Equal(t, []int64{7}, store.deletedIDs)
+	})
+
+	t.Run("deleting the last passkey is allowed (reopens bootstrap by design, ADR00021)", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeCredStore{creds: []webauthn.Credential{{ID: []byte("only-one")}}}
+		svc := newTestService(t, store, nil)
+
+		require.NoError(t, svc.DeletePasskey(t.Context(), 1))
+	})
+
+	t.Run("unknown id returns ErrPasskeyNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		store := &fakeCredStore{deleteFound: map[int64]bool{}}
+		svc := newTestService(t, store, nil)
+
+		err := svc.DeletePasskey(t.Context(), 404)
+		require.ErrorIs(t, err, ErrPasskeyNotFound)
+		assert.Empty(t, store.deletedIDs)
+	})
+
+	t.Run("store failure propagates", func(t *testing.T) {
+		t.Parallel()
+
+		svc := newTestService(t, &fakeCredStore{deleteErr: assert.AnError}, nil)
+		err := svc.DeletePasskey(t.Context(), 1)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestServiceLogout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a cookie that clears the session", func(t *testing.T) {
+		t.Parallel()
+
+		svc := newTestService(t, &fakeCredStore{}, nil)
+		cookie := svc.Logout()
+		assert.Equal(t, SessionCookieName, cookie.Name)
+		assert.Empty(t, cookie.Value)
+		assert.Negative(t, cookie.MaxAge)
 	})
 }

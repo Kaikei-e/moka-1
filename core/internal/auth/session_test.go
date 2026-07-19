@@ -67,3 +67,20 @@ func TestNewSessionCookie(t *testing.T) {
 		assert.Equal(t, http.SameSiteLaxMode, c.SameSite)
 	})
 }
+
+// TestClearSessionCookie はログアウト用のセッション失効 cookie(ADR00021 の cookie 属性は
+// 保ったまま、値を空にして即時削除させる)。moka-core はセッションストアを持たない
+// ステートレス設計なので、ログアウトは「この cookie を消せ」という応答を返すだけでよい。
+func TestClearSessionCookie(t *testing.T) {
+	t.Parallel()
+
+	c := clearSessionCookie()
+	assert.Equal(t, "moka_session", c.Name)
+	assert.Empty(t, c.Value)
+	assert.Equal(t, "/", c.Path)
+	assert.Negative(t, c.MaxAge, "MaxAge < 0 は net/http の即時削除シグナル(Max-Age: 0 として送出される)")
+	assert.True(t, c.HttpOnly)
+	assert.True(t, c.Secure)
+	assert.Equal(t, http.SameSiteLaxMode, c.SameSite)
+	assert.Equal(t, "moka_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax", c.String())
+}

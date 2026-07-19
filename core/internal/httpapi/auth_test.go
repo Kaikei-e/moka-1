@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,14 @@ import (
 
 // fakeAuthenticator は Authenticator のテストフェイク。ゼロ値は「未登録・儀式成功」。
 type fakeAuthenticator struct {
-	registered  func(ctx context.Context) (bool, error)
-	beginReg    func(ctx context.Context) (any, error)
-	finishReg   func(ctx context.Context, body io.Reader) (*http.Cookie, error)
-	beginLogin  func(ctx context.Context) (any, error)
-	finishLogin func(ctx context.Context, body io.Reader) (*http.Cookie, error)
+	registered    func(ctx context.Context) (bool, error)
+	beginReg      func(ctx context.Context) (any, error)
+	finishReg     func(ctx context.Context, body io.Reader) (*http.Cookie, error)
+	beginLogin    func(ctx context.Context) (any, error)
+	finishLogin   func(ctx context.Context, body io.Reader) (*http.Cookie, error)
+	listPasskeys  func(ctx context.Context) ([]auth.PasskeySummary, error)
+	deletePasskey func(ctx context.Context, id int64) error
+	logout        func() *http.Cookie
 }
 
 func (f *fakeAuthenticator) Registered(ctx context.Context) (bool, error) {
@@ -56,6 +60,39 @@ func (f *fakeAuthenticator) FinishLogin(ctx context.Context, body io.Reader) (*h
 		return testSessionCookie(), nil
 	}
 	return f.finishLogin(ctx, body)
+}
+
+func (f *fakeAuthenticator) ListPasskeys(ctx context.Context) ([]auth.PasskeySummary, error) {
+	if f.listPasskeys == nil {
+		return nil, nil
+	}
+	return f.listPasskeys(ctx)
+}
+
+func (f *fakeAuthenticator) DeletePasskey(ctx context.Context, id int64) error {
+	if f.deletePasskey == nil {
+		return nil
+	}
+	return f.deletePasskey(ctx, id)
+}
+
+func (f *fakeAuthenticator) Logout() *http.Cookie {
+	if f.logout == nil {
+		return clearedSessionCookie()
+	}
+	return f.logout()
+}
+
+// clearedSessionCookie は Logout フェイクの既定戻り値(cookie 契約どおりの失効 cookie)。
+func clearedSessionCookie() *http.Cookie {
+	return &http.Cookie{
+		Name:     "moka_session",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
 }
 
 // testSessionCookie は cookie 契約(ADR00021)どおりの Set-Cookie をフェイクが返すための
@@ -387,5 +424,157 @@ func TestHandleLoginFinish(t *testing.T) {
 		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	})
+}
+
+func TestHandleListPasskeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the list as-is", func(t *testing.T) {
+		t.Parallel()
+
+		created := time.Date(2026, 7, 19, 0, 0, 0, 0, time.UTC)
+		lastUsed := created.Add(time.Hour)
+		a := &fakeAuthenticator{listPasskeys: func(context.Context) ([]auth.PasskeySummary, error) {
+			return []auth.PasskeySummary{
+				{ID: 1, CreatedAt: created, LastUsedAt: &lastUsed},
+				{ID: 2, CreatedAt: created, LastUsedAt: nil},
+			}, nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/passkeys", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t,
+			`{"passkeys":[`+
+				`{"id":1,"created_at":"2026-07-19T00:00:00Z","last_used_at":"2026-07-19T01:00:00Z"},`+
+				`{"id":2,"created_at":"2026-07-19T00:00:00Z","last_used_at":null}`+
+				`]}`,
+			rec.Body.String())
+	})
+
+	t.Run("empty list is [] not null", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/passkeys", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: &fakeAuthenticator{}}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"passkeys":[]}`, rec.Body.String())
+	})
+
+	t.Run("missing session secret returns 503", func(t *testing.T) {
+		t.Parallel()
+
+		a := &fakeAuthenticator{listPasskeys: func(context.Context) ([]auth.PasskeySummary, error) {
+			return nil, auth.ErrUnavailable
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/passkeys", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	})
+
+	t.Run("store failure returns 500", func(t *testing.T) {
+		t.Parallel()
+
+		a := &fakeAuthenticator{listPasskeys: func(context.Context) ([]auth.PasskeySummary, error) {
+			return nil, assert.AnError
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/passkeys", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestHandleDeletePasskey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("existing passkey deletes with 204", func(t *testing.T) {
+		t.Parallel()
+
+		var gotID int64
+		a := &fakeAuthenticator{deletePasskey: func(_ context.Context, id int64) error {
+			gotID = id
+			return nil
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/auth/passkeys/7", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		assert.Equal(t, int64(7), gotID)
+	})
+
+	t.Run("non-numeric id returns 400", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/auth/passkeys/abc", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: &fakeAuthenticator{}}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("unknown id returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		a := &fakeAuthenticator{deletePasskey: func(context.Context, int64) error {
+			return auth.ErrPasskeyNotFound
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/auth/passkeys/404", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("missing session secret returns 503", func(t *testing.T) {
+		t.Parallel()
+
+		a := &fakeAuthenticator{deletePasskey: func(context.Context, int64) error {
+			return auth.ErrUnavailable
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/auth/passkeys/1", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	})
+
+	t.Run("store failure returns 500", func(t *testing.T) {
+		t.Parallel()
+
+		a := &fakeAuthenticator{deletePasskey: func(context.Context, int64) error {
+			return assert.AnError
+		}}
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/auth/passkeys/1", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: a}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestHandleLogout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("clears the session cookie and returns ok", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/auth/logout", nil)
+		rec := httptest.NewRecorder()
+		newTestMux(muxDeps{auth: &fakeAuthenticator{}}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"ok":true}`, rec.Body.String())
+		setCookie := rec.Header().Get("Set-Cookie")
+		assert.Contains(t, setCookie, "moka_session=")
+		assert.Contains(t, setCookie, "Max-Age=0")
 	})
 }

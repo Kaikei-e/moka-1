@@ -47,6 +47,9 @@ func NewMux(
 	mux.HandleFunc("POST /api/v1/auth/register/finish", handleRegisterFinish(authn))
 	mux.HandleFunc("POST /api/v1/auth/login/begin", handleLoginBegin(authn))
 	mux.HandleFunc("POST /api/v1/auth/login/finish", handleLoginFinish(authn))
+	mux.HandleFunc("GET /api/v1/auth/passkeys", handleListPasskeys(authn))
+	mux.HandleFunc("DELETE /api/v1/auth/passkeys/{id}", handleDeletePasskey(authn))
+	mux.HandleFunc("POST /api/v1/auth/logout", handleLogout(authn))
 	// メソッド無しパターンはメソッド不一致時の受け皿(無いと /api/ スタブが 501 で拾ってしまう)
 	mux.HandleFunc("/api/v1/feeds", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/feeds/{id}", handleMethodNotAllowed)
@@ -64,6 +67,9 @@ func NewMux(
 	mux.HandleFunc("/api/v1/auth/register/finish", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/auth/login/begin", handleMethodNotAllowed)
 	mux.HandleFunc("/api/v1/auth/login/finish", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/passkeys", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/passkeys/{id}", handleMethodNotAllowed)
+	mux.HandleFunc("/api/v1/auth/logout", handleMethodNotAllowed)
 	mux.HandleFunc("/api/", handleAPIStub)
 	return mux
 }

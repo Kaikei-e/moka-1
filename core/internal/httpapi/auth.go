@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Kaikei-e/moka-1/core/internal/auth"
 )
@@ -19,6 +20,12 @@ type Authenticator interface {
 	FinishRegistration(ctx context.Context, body io.Reader) (*http.Cookie, error)
 	BeginLogin(ctx context.Context) (any, error)
 	FinishLogin(ctx context.Context, body io.Reader) (*http.Cookie, error)
+	// ListPasskeys は管理画面向けの登録済み資格情報一覧を返す。
+	ListPasskeys(ctx context.Context) ([]auth.PasskeySummary, error)
+	// DeletePasskey は id の資格情報をハード削除する(ErrPasskeyNotFound は 404 に写像)。
+	DeletePasskey(ctx context.Context, id int64) error
+	// Logout はセッション cookie を失効させる応答を返す(失敗しない — ステートレス設計)。
+	Logout() *http.Cookie
 }
 
 // handleAuthStatus は GET /api/v1/auth/status。パスキー登録済みかを返す
@@ -88,6 +95,49 @@ func handleLoginFinish(a Authenticator) http.HandlerFunc {
 	}
 }
 
+// handleListPasskeys は GET /api/v1/auth/passkeys。パスキー管理画面向けの一覧。
+func handleListPasskeys(a Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := a.ListPasskeys(r.Context())
+		if err != nil {
+			writeAuthError(w, err, http.StatusBadRequest)
+			return
+		}
+		if list == nil {
+			list = []auth.PasskeySummary{} // JSON では null でなく [] を返す
+		}
+		writeJSON(w, http.StatusOK, map[string][]auth.PasskeySummary{"passkeys": list})
+	}
+}
+
+// handleDeletePasskey は DELETE /api/v1/auth/passkeys/{id}。ハード削除(ADR00019 と
+// 同じ流儀)。最後の1本を消すことも許す — パスキーが1本も無い状態はブートストラップを
+// 再び開くので、鍵を失っても自分自身で再登録して復旧できる(ADR00021)。
+func handleDeletePasskey(a Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid passkey id")
+			return
+		}
+		if err := a.DeletePasskey(r.Context(), id); err != nil {
+			writeAuthError(w, err, http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// handleLogout は POST /api/v1/auth/logout。セッション cookie を失効させる。
+// moka-core はセッションストアを持たないステートレス設計(ADR00021)なので、
+// 認証状態に関わらず常に 200(失敗しない)。
+func handleLogout(a Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.SetCookie(w, a.Logout())
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	}
+}
+
 // writeAuthError は auth ドメインの sentinel を HTTP ステータスへ写像する。
 // ceremonyFailedStatus は ErrCeremonyFailed の写像先 — 登録(400: クライアントの
 // attestation が不正)とログイン(401: 認証失敗)でだけ意味が分かれる。
@@ -101,6 +151,8 @@ func writeAuthError(w http.ResponseWriter, err error, ceremonyFailedStatus int) 
 		writeError(w, http.StatusNotFound, "no passkey registered")
 	case errors.Is(err, auth.ErrNoCeremony):
 		writeError(w, http.StatusBadRequest, "no pending ceremony")
+	case errors.Is(err, auth.ErrPasskeyNotFound):
+		writeError(w, http.StatusNotFound, "passkey not found")
 	case errors.Is(err, auth.ErrCeremonyFailed):
 		if ceremonyFailedStatus == http.StatusUnauthorized {
 			writeError(w, http.StatusUnauthorized, "authentication failed")

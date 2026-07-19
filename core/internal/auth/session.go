@@ -47,6 +47,22 @@ func newSessionCookie(secret []byte, issued time.Time) *http.Cookie {
 	}
 }
 
+// clearSessionCookie はログアウト用のセッション失効 cookie を作る。moka-core は
+// セッションストアを持たない(ステートレス — ADR00021)ため、失効は「ブラウザにこの
+// cookie を即座に消させる」ことでのみ表現される。属性は newSessionCookie と同じに保ち
+// (Plecto フィルタの cookie 名/Path 前提を崩さない)、値は空・MaxAge を負にして削除させる。
+func clearSessionCookie() *http.Cookie {
+	return &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
 // readSecretFile は SESSION_HMAC_KEY_FILE の指すファイルから HMAC 鍵を読む
 // (POSTGRES_PASSWORD_FILE と同じファイルベース Docker secrets 流儀 — ADR00003)。
 // 契約(Plecto フィルタと共有): ファイル内容の前後空白を trim した文字列の UTF-8
