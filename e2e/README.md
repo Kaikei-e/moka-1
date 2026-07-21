@@ -58,7 +58,12 @@ bash e2e/hurl/core/enrich_e2e.sh
 # 上記の「ちょうどN件」前提の厳密なカウントアサーションを崩さないよう必ず最後に走らせる
 bash e2e/hurl/core/scheduler_e2e.sh
 
-# 7. llm 完全停止時のフェイルソフト検証(M2): e2e-llm-mock を止めて、検索のテキスト単独 200 と
+# 7. 問い返し Q&A の文脈検索クエリが対象記事のタイトルを連結して構成されることの検証
+# (RAG 精度改善)。独自フィード(同一タイトル・別トピックの2記事)を登録するので、
+# 上記の厳密なカウントアサーションの後、かつ e2e-llm-mock を止める 8 より前に走らせる
+bash e2e/hurl/core/qa_context_relevance_e2e.sh
+
+# 8. llm 完全停止時のフェイルソフト検証(M2): e2e-llm-mock を止めて、検索のテキスト単独 200 と
 # Q&A の SSE error イベントを確認し、終了時にモックを再開する。停止中は enrich.Scheduler も
 # 失敗 attempt を積むため、必ず一番最後に走らせる
 bash e2e/hurl/core/rag_failsoft_e2e.sh

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- moka-1 E2E フィクスチャ(問い返し Q&A の文脈選定クエリ配線検証用)。
+     qa_context_relevance_e2e.sh がこのフィードを登録する。2記事とも英字のみの造語
+     "Zyloforge Marmalade Expedition Chronicle" をタイトルに使い、他の全フィクスチャ
+     (feed.xml 等の "First/Second/Third/Archive article" 群)の字面と絶対に重ならない
+     よう意図的に非日常的な単語を選んでいる(pg_trgm 類似度アサーションの偶発ヒット防止)。
+     2記事は同一タイトル・別内容(異なるトピックの content)にしてあり、質問文にタイトル
+     語を連結するかどうかで、ヒットしないはずの記事2(内容は無関係)がテキスト側検索
+     (pg_trgm similarity)で拾われるかどうかが変わる — これが「クエリ構成が変わると
+     ヒット集合が変わる」という配線レベルの契約の検証に使う唯一の手がかり。 -->
+<rss version="2.0">
+  <channel>
+    <title>Moka E2E QA Context Fixture</title>
+    <link>http://e2e-fixtures/</link>
+    <description>Feed for verifying the qa context search query wiring (title concatenation)</description>
+    <item>
+      <title>Zyloforge Marmalade Expedition Chronicle</title>
+      <link>http://e2e-fixtures/articles/qactx-1</link>
+      <guid isPermaLink="false">urn:moka-e2e-qactx:1</guid>
+      <pubDate>Wed, 01 Jul 2026 09:00:00 GMT</pubDate>
+      <description>Notes on hiking gear weight budgets and expedition route logistics.</description>
+    </item>
+    <item>
+      <title>Zyloforge Marmalade Expedition Chronicle</title>
+      <link>http://e2e-fixtures/articles/qactx-2</link>
+      <guid isPermaLink="false">urn:moka-e2e-qactx:2</guid>
+      <pubDate>Wed, 01 Jul 2026 10:00:00 GMT</pubDate>
+      <description>A sourdough bread recipe with detailed fermentation timing and hydration ratios.</description>
+    </item>
+  </channel>
+</rss>
