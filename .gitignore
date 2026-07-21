@@ -13,10 +13,15 @@ models/*
 plecto/certs/*
 !plecto/certs/.gitkeep
 
-# eval/ の記事本文(著作権)とサーバログは非コミット。manifest.json と results/ はコミットする
+# eval/ の記事本文(著作権)は非コミット。manifest.json のみコミットする
 eval/data/articles/art-*.json
 eval/data/feeditems.json
-eval/results/server-logs/
+
+# eval/ の計測結果はローカル生成物 — 非コミット。旧規範は「results/はコミット対象」
+# だったが、context_relevance タスクで著作権のある記事抜粋が results/pairs/ に生テキストの
+# まま乗ることが判明し撤回した(ADR00023)。既存のコミット済み結果ファイル(研究エビデンス等)
+# はこのルールでは非表示にならない(git は追跡済みパスを .gitignore で隠さない)
+eval/results/
 
 # Python バイトコード(eval/)— 絶対パスを内包するためコミット禁止
 __pycache__/
