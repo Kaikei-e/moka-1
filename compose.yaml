@@ -44,7 +44,7 @@ services:
   #                       → docker compose run --rm plecto-manifest-render
   #                       → docker compose kill -s HUP plecto
   plecto-filters-build:
-    image: rust:1.96.1-trixie@sha256:1f0dbad1df66647807e6952d1db85d0b2bda7606cb2139d82517e4f009967376 # Plecto 本体の rust-toolchain.toml(1.96.0 系)に合わせて pin
+    image: rust:1.97.1-trixie@sha256:4f9fcd47f7c1126d2c8dd20e594f8ec852492fe429c2c6c11ca56eebfffaf0d9 # Plecto 本体の rust-toolchain.toml(1.97.1)に合わせて pin
     entrypoint: ["/bin/bash", "/job/filters-build.sh"]
     volumes:
       - ./plecto/build:/job:ro
@@ -57,8 +57,8 @@ services:
 
   # manifest テンプレートに Docker secret(session_hmac_key)とビルド済みフィルタの digest を
   # 埋めて、plecto が読む完成 manifest を plecto-runtime volume にレンダリングする one-shot
-  # ジョブ。Plecto の [filter.config] にはファイル間接参照・env 展開が無く(インライン文字列
-  # のみ)、ファイルベース secrets(ADR00003)とはここで橋渡しする。手順本体は
+  # ジョブ。Plecto 0.5.0 で [filter.config_files] が入りファイル間接参照は可能になったが、
+  # digest pin の埋め込みもこのジョブが担うので現状は維持。手順本体は
   # plecto/build/manifest-render.sh。テンプレート編集後は run --rm でこのジョブを再実行 → HUP
   plecto-manifest-render:
     image: alpine:3.22
@@ -81,7 +81,7 @@ services:
   # 公式イメージ(ghcr.io/kaikei-e/plecto)固定 — ADR00005 の Revisit Trigger(公式イメージ配布)
   # が発火したためソースビルドから移行。タグは可変なので digest も併記して pin する。
   plecto:
-    image: ghcr.io/kaikei-e/plecto:0.4.2@sha256:979994aa6530cb31f95dad493f53b3a80151632861f2bedafe8b014091e3fbbe
+    image: ghcr.io/kaikei-e/plecto:0.5.3@sha256:a0be871b6a7887bd628537eb9fb4922ce7dce061db31f69feef25c5df0556c07 # minimal profile(ADR 000079)
     command: ["/run/plecto/manifest.toml"] # bind アドレスは manifest の [listen] 側(CLI引数は渡さない)
     restart: unless-stopped
     ports:
@@ -99,9 +99,14 @@ services:
         condition: service_completed_successfully
       plecto-manifest-render:
         condition: service_completed_successfully
-    # healthcheck 無し: 公式イメージは distroless で curl もシェルも無く、plecto CLI にも
-    # moka-core の `moka healthz` に相当する自己プローブ用サブコマンドが無い(validate/schema/
-    # --version のみ)。Plecto 側に issue 起票予定。手動確認は README の運用コマンド参照
+    # distroless なので exec 配列のみ(シェル無し)。plecto healthz は 0.5.0 で追加(既定 /readyz)
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/plecto", "healthz", "/run/plecto/manifest.toml"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+      start_interval: 2s
 
   # API + 常駐エージェントループ(Go 単一バイナリ)
   moka-core:

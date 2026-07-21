@@ -10,7 +10,7 @@ description: Rust ベストプラクティス(Plecto WASM フィルタ向け、E
 moka-1 の Rust は**サーバーではなく WASM Component Model フィルタ**(`plecto:filter@0.3.0` WIT コントラクト実装 — 契約バージョンは Plecto 本体と独立採番)。
 Alt の tokio サーバー規約とは別物。ここでの失敗・不便はドッグフーディングの成果物 — 回避策で黙って進めず Plecto に issue/ADR を起票する(tenets §3.5)。
 
-## ツールチェーン(Plecto 0.4.2 実測 — Phase 2 実装 2026-07-19 で確定)
+## ツールチェーン(Plecto 0.5.3 / MSRV 1.97.1 — WIT は Phase 2 実装 2026-07-19 の plecto:filter@0.3.0 のまま)
 
 1. **`wasm32-unknown-unknown` + `wasm-tools component new` の2段構え**(Plecto docs/writing-a-filter.md の公式手順。**wasip2 ではない** — Tier A フィルタは zero-WASI で、`wasi:*` import が1つでもあるとロード拒否される)。cargo-component も使わない:
    ```bash
