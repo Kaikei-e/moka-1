@@ -51,10 +51,20 @@ uv run moka-eval pairs --run-a d1-lfm25-summ --run-b d1-qwen4b-summ --task summa
 uv run moka-eval judge --name d1-summarize --judge gptoss20b
 uv run moka-eval score --name d1-summarize --judges gptoss20b,claude
 
-# 7. Embedding retrieval(コーパス=収集記事、クエリ=data/retrieval/queries.json)
+# 7. Embedding retrieval(コーパス=収集記事、クエリ=data/retrieval/queries.json)。
+# "generic" スタイルのクエリ(トピック語なし一般要約質問)は gold 一致で採点できない
+# ため recall@k/MRR からは自動的に除外される(embed.load_recall_queries)
 uv run moka-eval embed --model qwen3-emb-0.6b --dims 1024,768,512
 uv run moka-eval embed --model qwen3-emb-4b   --dims 2560,1024
 uv run moka-eval embed --model bge-m3
+
+# 8. Q&A 文脈選定クエリ構成(タイトル連結、RAG精度改善)の評価。"generic" クエリごとに
+# 質問文単独 vs タイトル連結クエリでのコサイン近傍 top-k を比較材料化し(DBを持たない
+# eval/ 環境ではハイブリッド検索のベクトル側だけの近似 — context_relevance.py 参照)、
+# 6と同じ pairwise MoA 審判(ブラインド化+位置スワップ)にそのまま乗せる
+uv run moka-eval context-relevance --model qwen3-emb-0.6b --name qa-context-relevance
+uv run moka-eval judge --name qa-context-relevance --judge gptoss20b --lenses topical_relevance
+uv run moka-eval score --name qa-context-relevance --judges gptoss20b,claude
 ```
 
 ## 審判プロトコル(Phase R 調査準拠)
@@ -67,12 +77,19 @@ uv run moka-eval embed --model bge-m3
   gpt-oss 判定は参考値として記録
 - 集計: tie 除外の両側符号検定 + 位置一貫性率 + 審判間一致率(`score` が全部出す)
 
+このプロトコルは要約A/B比較専用ではなく、`context-relevance`(検索候補記事一覧A/Bの
+比較、lens="topical_relevance")もそのまま乗せている — `judge`/`score` コマンド自体は
+比較対象の中身(要約テキストか候補記事一覧テキストか)を区別しない。
+
 ## 結果の置き場
 
 - `results/<run_id>/generations.jsonl` — 1行1試行、自己記述的(bp-python §11)
-- `results/pairs/` `results/judgments/` `results/summary/` — 判定と集計(コミット対象)
+- `results/pairs/` `results/judgments/` `results/summary/` — 判定と集計
 - `results/research/` — Phase R 調査エビデンス
-- `results/server-logs/` — llama-server ログ(gitignore)
+- `results/server-logs/` — llama-server ログ
+
+`results/` 配下は全てローカル生成物であり非コミット(gitignore)。実測結果を後から参照したい
+場合は ADR 本文に数値を書き残す(例: ADR00023)か、ローカルに保持すること。
 
 ## CI パリティ
 

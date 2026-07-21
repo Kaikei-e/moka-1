@@ -83,9 +83,9 @@ cd plecto/filters && cargo fmt --check && cargo clippy --target wasm32-unknown-u
 (判定ロジックは host API 非依存の純関数に切り出してあり、native `cargo test` で回る。
 WIT 越しの実挙動はエッジ経由の E2E で守る — tdd-workflow)
 
-公式イメージは distroless(シェル/openssl 無し)で、`plecto` CLI にも moka-core の
-`moka healthz` に相当する自己プローブ用サブコマンドが無いため、compose の `healthcheck:` は
-張っていない。上記の `curl` で手動確認するか、`docker compose logs plecto` で起動ログを見る。
+公式イメージは distroless(シェル/openssl 無し)だが、Plecto 0.5.0 以降は `plecto healthz` が
+あり compose の `healthcheck:` で `/readyz` を自己プローブする。手動確認は上記の `curl` か
+`docker compose ps` / `docker compose logs plecto`。
 
 ## upstream 契約
 
