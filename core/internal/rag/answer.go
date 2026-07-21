@@ -19,6 +19,13 @@ const (
 	// 見直す(eval/ の仕事)。
 	answerTargetMaxRunes  = 3000
 	answerContextMaxRunes = 500
+	// contextScoreRatio は文脈選定で先頭(最高スコア)ヒットに対して許容する最低相対スコア比。
+	// hits[0].Score * contextScoreRatio 未満の RRF 融合スコアは「先頭に比べて明らかに弱い」
+	// として文脈から落とす。RRF 融合後スコアは順位由来の構造値であって関連性の絶対量ではない
+	// ため絶対閾値には向かない(Cormack et al., SIGIR 2009 の RRF 原論文、Azure AI Search
+	// 公式ドキュメントが同じ理由を明言している)— 相対比ならこの制約を回避できる。
+	// 初期値 0.5、eval/ の retrieval 実測で調整対象(rrfK と同じコメント作法、search.go 参照)。
+	contextScoreRatio = 0.5
 )
 
 // QAStore は問い返しユースケースの永続化ポート(消費側定義 — 具象は internal/store)。
@@ -120,11 +127,19 @@ func (s *Answerer) Ask(
 	return AnswerResult{QuestionID: questionID, AnswerID: answerID}, nil
 }
 
-// searchContext は質問をクエリにハイブリッド検索し、当該記事を除いた top-k を文脈に選ぶ。
-// 検索失敗は warn ログだけ残して文脈ゼロに縮退する。
+// searchContext は当該記事のタイトル+質問をクエリにハイブリッド検索し、当該記事を除いた
+// top-k のうち先頭ヒットに対して極端に弱いものを落として文脈に選ぶ。検索失敗は warn ログ
+// だけ残して文脈ゼロに縮退する。
+//
+// クエリにタイトルを連結するのは、トピック語を含まない質問(「この記事の要点は?」等)でも
+// 記事タイトルの固有名詞・トピック語が検索クエリに乗るようにするため、かつ文書側 embedding
+// (embed.go の EmbedArticle、title + "\n" + 本文)とクエリ側 embedding の非対称を解消する
+// ため(質問文だけだと文書側にしか無いタイトル情報が拾えず、意味的な手がかりが弱くなる)。
 func (s *Answerer) searchContext(ctx context.Context, article feed.Article, question string) []SearchHit {
+	query := article.Title + "\n" + question
+
 	// 当該記事が上位に混ざる分を 1 件多めに引いてから除外する
-	hits, err := s.search.Search(ctx, question, contextTopK+1)
+	hits, err := s.search.Search(ctx, query, contextTopK+1)
 	if err != nil {
 		s.log.Warn("context search failed, answering from the article alone", "article_id", article.ID, "err", err.Error())
 		return nil
@@ -140,7 +155,27 @@ func (s *Answerer) searchContext(ctx context.Context, article feed.Article, ques
 			break
 		}
 	}
-	return contexts
+	return dropWeakContexts(contexts)
+}
+
+// dropWeakContexts は先頭(最高スコア)ヒットに対して相対的に極端に弱いヒットを落とす
+// (contextScoreRatio 参照)。contexts は呼び出し元(searchContext)からスコア降順のまま渡る
+// 前提 — Searcher.Search / fuseRRF の契約(search.go)であり、ここでは並び替えない。
+// 結果が0件になっても構わない(呼び出し元のフェイルソフト経路がそのまま機能する)。
+func dropWeakContexts(contexts []SearchHit) []SearchHit {
+	if len(contexts) == 0 {
+		return contexts
+	}
+	floor := contexts[0].Score * contextScoreRatio
+
+	out := make([]SearchHit, 0, len(contexts))
+	for _, c := range contexts {
+		if c.Score < floor {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 // buildPrompt は回答生成のユーザーテキストを組む。対象記事は最新の取り寄せ済み全文を

@@ -111,7 +111,7 @@ func TestAnswererAsk(t *testing.T) {
 
 		assert.Equal(t, int64(7), store.gotArticleID, "質問は受信時に qa_questions へ")
 		assert.Equal(t, "これは何の話?", store.gotQuestion)
-		assert.Equal(t, "これは何の話?", search.gotQuery, "検索クエリは質問そのもの")
+		assert.Equal(t, "対象記事\nこれは何の話?", search.gotQuery, "検索クエリは対象記事タイトル+質問(変更1)")
 
 		require.Len(t, gotSources, 2)
 		assert.Equal(t, Source{ID: 3, Title: "文脈記事", URL: "https://example.com/ctx"}, gotSources[0])
@@ -255,5 +255,78 @@ func TestAnswererAsk(t *testing.T) {
 
 		_, err := s.Ask(t.Context(), targetArticle(), "q", func([]Source) {}, func(string) {})
 		require.Error(t, err)
+	})
+}
+
+// TestAnswererSearchContext は文脈検索クエリの組み立て(変更1: タイトル連結)と、
+// 弱いヒットの相対閾値フィルタ(変更2)を、searchContext 単体で検証する。
+func TestAnswererSearchContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("includes article title in context search query", func(t *testing.T) {
+		t.Parallel()
+
+		search := &fakeContextSearcher{hits: searchHits(3, 4)}
+		s := NewAnswerer(&fakeQAStore{}, &fakeFullTextLookup{}, search, &fakeAnswerCompleter{}, discardLogger())
+
+		s.searchContext(t.Context(), targetArticle(), "これは何の話?")
+
+		assert.Equal(t, "対象記事\nこれは何の話?", search.gotQuery,
+			"クエリは対象記事タイトル+改行+質問(文書側 embedding の title+本文と対称にする)")
+	})
+
+	t.Run("drops hits far weaker than the top hit", func(t *testing.T) {
+		t.Parallel()
+
+		hits := []SearchHit{
+			{Article: feed.Article{ID: 3, Title: "強い文脈", URL: "https://example.com/3"}, Score: 0.02},
+			{Article: feed.Article{ID: 4, Title: "そこそこ", URL: "https://example.com/4"}, Score: 0.011}, // 0.02*0.5=0.01 以上 → 残る
+			{Article: feed.Article{ID: 5, Title: "弱すぎ", URL: "https://example.com/5"}, Score: 0.005},  // 0.01 未満 → 落ちる
+		}
+		search := &fakeContextSearcher{hits: hits}
+		s := NewAnswerer(&fakeQAStore{}, &fakeFullTextLookup{}, search, &fakeAnswerCompleter{}, discardLogger())
+
+		got := s.searchContext(t.Context(), targetArticle(), "q")
+
+		ids := make([]int64, 0, len(got))
+		for _, c := range got {
+			ids = append(ids, c.ID)
+		}
+		assert.Equal(t, []int64{3, 4}, ids, "先頭ヒットの score * 0.5 未満は文脈から落ちる")
+	})
+
+	t.Run("keeps only the top hit when every other hit is far weaker", func(t *testing.T) {
+		t.Parallel()
+
+		hits := []SearchHit{
+			{Article: feed.Article{ID: 3, Title: "唯一の強い文脈", URL: "https://example.com/3"}, Score: 1.0},
+			{Article: feed.Article{ID: 4, Title: "弱い", URL: "https://example.com/4"}, Score: 0.1},
+			{Article: feed.Article{ID: 5, Title: "もっと弱い", URL: "https://example.com/5"}, Score: 0.01},
+		}
+		search := &fakeContextSearcher{hits: hits}
+		s := NewAnswerer(&fakeQAStore{}, &fakeFullTextLookup{}, search, &fakeAnswerCompleter{}, discardLogger())
+
+		got := s.searchContext(t.Context(), targetArticle(), "q")
+
+		require.Len(t, got, 1)
+		assert.Equal(t, int64(3), got[0].ID)
+	})
+
+	t.Run("all hits far weaker than the top hit still leaves the top hit itself", func(t *testing.T) {
+		t.Parallel()
+
+		// フィルタは先頭ヒット自身には自明に効かない(score >= score*ratio は常に真)。
+		// 文脈が完全にゼロ件になるのは検索そのものがヒットゼロ・全滅を返した時のみ
+		// (既存のフェイルソフト経路)。
+		hits := []SearchHit{
+			{Article: feed.Article{ID: 3, Title: "唯一のヒット", URL: "https://example.com/3"}, Score: 0.001},
+		}
+		search := &fakeContextSearcher{hits: hits}
+		s := NewAnswerer(&fakeQAStore{}, &fakeFullTextLookup{}, search, &fakeAnswerCompleter{}, discardLogger())
+
+		got := s.searchContext(t.Context(), targetArticle(), "q")
+
+		require.Len(t, got, 1)
+		assert.Equal(t, int64(3), got[0].ID)
 	})
 }
