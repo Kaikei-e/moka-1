@@ -1,6 +1,6 @@
 # moka-1
 
-**moka** = **M**ixture **o**f **K**nowledge **A**gent。
+**moka** = **M**ixture **o**f **K**nowledge **A**gents。
 `docker compose up -d` 一発で起動して常駐する、エージェント型 RSS フィードリーダー。
 [Plecto](https://github.com/Kaikei-e/Plecto) のドッグフーディングプロジェクトを兼ねる。
 設計は [docs/tenets/moka-tenets.md](docs/tenets/moka-tenets.md)、決定記録は [docs/adr/](docs/adr/)。

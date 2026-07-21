@@ -1,6 +1,6 @@
 # moka-1
 
-**moka** = **M**ixture **o**f **K**nowledge **A**gent.
+**moka** = **M**ixture **o**f **K**nowledge **A**gents.
 An agentic RSS feed reader that starts with a single `docker compose up -d` and keeps working in the background.
 Also the dogfooding project for [Plecto](https://github.com/Kaikei-e/Plecto).
 Design principles live in [docs/tenets/moka-tenets.md](docs/tenets/moka-tenets.md), decisions in [docs/adr/](docs/adr/).
