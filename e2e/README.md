@@ -15,6 +15,11 @@ moka-core / moka-web のホスト公開も無い。
 ## 前提
 
 - `cd e2e && pnpm install`(API / エッジ層)、`cd web && pnpm install`(UI 層)
+- **依存を追加・更新するときは pnpm 11 を使うこと**(CI の `pnpm/action-setup` が 11 で固定)。
+  pnpm 11 は supply-chain policy(`minimumReleaseAge` — 公開直後のバージョンを拒否する)を
+  **解決時に**適用するが、pnpm 10 は適用しない。pnpm 10 で作ったロックファイルは公開直後の
+  バージョンを掴んでしまい、CI の `pnpm install --frozen-lockfile` が
+  `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちる
 - **API / エッジ層はブラウザを使わない**(`request` フィクスチャのみ)ので `playwright install` は不要。
   UI 層だけ `cd web && pnpm exec playwright install chromium` が要る
 - **フレッシュ DB で走らせる**(201 / 記事件数 / 空状態のアサーションは残留データで壊れる)。
