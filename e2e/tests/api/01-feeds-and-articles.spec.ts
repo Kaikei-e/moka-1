@@ -13,17 +13,24 @@ import type { ArticleResponse, FeedRegistration, FullTextResponse } from '../../
 // RSS フィード登録 → 記事一覧(M0: feed registered → articles readable)
 // 移行元: hurl/core/feeds_and_articles.hurl
 //
-// 前提: フレッシュ DB。moka-core の起動待ち(旧 Hurl 冒頭の retry 付き GET /healthz)は
+// 前提: フレッシュ DB(e2e/README.md の「フレッシュ状態にする」手順で e2e-db をリセットした状態)。
+// 旧 Hurl の `--jobs 1`(DB 依存シナリオなので直列)は playwright.config.ts の
+// fullyParallel: false + workers: 1 が受け持つ。
+// moka-core の起動待ち(旧 Hurl 冒頭の retry: 10 / retry-interval: 2000 付き GET /healthz)は
 // tests/setup/core-health.setup.ts の setup プロジェクトに集約済みなので、このファイルでは書かない。
 // このファイルは実行順で最初の API spec(01-)であることが前提: 「フィード1件・記事ちょうど25件」
 // という厳密なカウントのアサーションを含むため、他のフィードをまだ登録していない状態で走る
 // 必要がある(e2e/README.md の実行順表を参照)。
 //
-// 変数: feedId(フィード登録直後の冪等性確認だけで使う)・nextCursor・fulltextText は、
-// 捕捉した test() の中だけで使い切るのでローカル変数で足りる。articleId は複数の test() を
-// またいで参照する(記事単体取得・全文取り寄せの2箇所)ので、モジュールスコープの変数に置く。
-// test.describe.configure({ mode: 'serial' }) によりこのファイル内は直列実行(1つ落ちたら
-// 後続は skip)が保証されるので、モジュールスコープでの受け渡しが安全に成立する。
+// 変数: 旧 Hurl の `--variable host=http://localhost:8080`(例)は playwright.config.ts の
+// use.baseURL(support/env.ts の coreBaseURL)へ、`--variable fixture_url=http://e2e-fixtures/feed.xml`
+// (例)は下の fixtureURL(fixtures.main) へ移した。
+// キャプチャ相当の変数のうち feedId(フィード登録直後の冪等性確認だけで使う)・nextCursor・
+// fulltextText は、捕捉した test() の中だけで使い切るのでローカル変数で足りる。articleId は
+// 複数の test() をまたいで参照する(記事単体取得・全文取り寄せの2箇所)ので、モジュール
+// スコープの変数に置く。test.describe.configure({ mode: 'serial' }) によりこのファイル内は
+// 直列実行(1つ落ちたら後続は skip)が保証されるので、モジュールスコープでの受け渡しが
+// 安全に成立する。
 let articleId: number;
 
 const fixtureUrl = fixtureURL(fixtures.main);
