@@ -59,7 +59,7 @@ Alt の tokio サーバー規約とは別物。ここでの失敗・不便はド
 ## テスト
 
 17. **ロジックは native でユニットテスト**: 判定ロジックを host API 非依存の純関数(`&HeaderMap -> Verdict` 的シグネチャ)に切り出し、`cargo test`(ホスト native)で回す。host API はトレイトで抽象化してフェイクを注入
-18. **境界は E2E で**: WIT 越しの実挙動は Plecto ホストに実際にロードして Hurl で検証(tdd-workflow の `e2e/hurl/edge/`)。wasmtime を使った自前ハーネスは作らない(Plecto のカンフォーマンステストに寄せる)
+18. **境界は E2E で**: WIT 越しの実挙動は Plecto ホストに実際にロードして Playwright で検証(tdd-workflow の `e2e/tests/edge/`、`cd e2e && pnpm test:edge`)。wasmtime を使った自前ハーネスは作らない(Plecto のカンフォーマンステストに寄せる)
 19. **CI パリティ**: `cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo clippy --target wasm32-unknown-unknown --release -- -D warnings && cargo test && cargo build --target wasm32-unknown-unknown --release`
 
 ## 配布(Phase 2 で前倒し確定)

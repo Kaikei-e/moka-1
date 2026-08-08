@@ -168,13 +168,15 @@ jobs:
             exit 1
           fi
 
-  # E2E(Hurl・API層)。Playwright とは別のフレッシュ DB で走らせる(e2e/README.md)。
+  # E2E(Playwright・API層)。UI 層とは別のフレッシュ DB で走らせる(e2e/README.md)。
   # CI ランナーは1ジョブ=使い捨て VM なので down -v で後始末してよい(ローカル手順の本番 db-data 保護は不要)
-  e2e-hurl:
+  e2e-api:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 埋め込み完了待ち(search)・スケジューラの自律再取得待ち・濃縮待ちを含む全シナリオを
+    # 1コマンドで通すので、Hurl 時代の 20 分から広げてある
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: E2E 用の使い捨て secret を用意(postgres + session HMAC)
@@ -184,44 +186,48 @@ jobs:
           mkdir -p secrets
           openssl rand -base64 24 | tr -d '/+=' > secrets/postgres_password.txt
           openssl rand -hex 32 > secrets/session_hmac_key.txt
-      - name: install hurl (ローカル開発環境と同じ 8.0.1 に固定)
-        run: |
-          curl -fsSL -o /tmp/hurl.deb https://github.com/Orange-OpenSource/hurl/releases/download/8.0.1/hurl_8.0.1_amd64.deb
-          sudo dpkg -i /tmp/hurl.deb
+      - uses: pnpm/action-setup@008330803749db0355799c700092d9a85fd074e9 # v6.0.9
+        with:
+          version: 11
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: e2e/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: e2e
+      # ローカル CI パリティ(e2e/README.md)。Playwright 自身は型検査をしないので tsc は別途要る
+      - run: pnpm lint
+        working-directory: e2e
+      - run: pnpm check
+        working-directory: e2e
+      # API 層は request フィクスチャだけを使いブラウザを起動しないので playwright install は不要
       - name: docker compose up (moka-core + e2e-fixtures)
         run: docker compose -f compose.yaml -f compose.e2e.yaml up -d --build --wait --wait-timeout 180 moka-core e2e-fixtures
-      - name: hurl
-        # summarize.hurl は本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る。
-        # articles_null_published_at.hurl は「limit=1 で先頭記事を拾う」前提の summarize.hurl より
-        # 後に置く(NULL published_at 記事が fallback で全記事中最新になり得るため、順序を守る)。
-        # read_and_feed_delete.hurl は末尾で null-pubdate フィードを削除するので hurl 群の最後に置く
-        run: |
-          mkdir -p e2e/hurl/reports
-          hurl --test --jobs 1 --report-junit e2e/hurl/reports/junit.xml \
-            --variable host=http://localhost:8080 \
-            --variable fixture_url=http://e2e-fixtures/feed.xml \
-            --variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml \
-            e2e/hurl/core/feeds_and_articles.hurl e2e/hurl/core/summarize.hurl e2e/hurl/core/articles_null_published_at.hurl e2e/hurl/core/read_and_feed_delete.hurl
-      - name: scheduler e2e(常駐スケジューラの自律再取得を検証)
-        # 上記 hurl 群の後に走らせる — 独自フィードを追加登録するため、既存ファイルの
-        # 「ちょうどN件」前提の厳密なカウントアサーションを崩さない順序を守る
-        run: bash e2e/hurl/core/scheduler_e2e.sh
+      - name: playwright (api)
+        # 実行順序はファイル名の連番が決める(workers=1 + fullyParallel=false)。
+        # 順序の前提は e2e/README.md の表と各 spec 冒頭のコメントに書いてある。
+        # 要約・Q&A・埋め込みは本物の llm ではなく compose.e2e.yaml の e2e-llm-mock(GPU 不要)に対して走る
+        run: pnpm test
+        working-directory: e2e
       - name: dump compose logs
         if: always()
-        run: docker compose -f compose.yaml -f compose.e2e.yaml logs --no-color > compose-logs-hurl.txt
+        run: docker compose -f compose.yaml -f compose.e2e.yaml logs --no-color > compose-logs-api.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: e2e-hurl-results
+          name: e2e-api-results
           path: |
-            e2e/hurl/reports/
-            compose-logs-hurl.txt
+            e2e/reports/
+            e2e/playwright-report/
+            e2e/test-results/
+            compose-logs-api.txt
       - name: docker compose down
         if: always()
         run: docker compose -f compose.yaml -f compose.e2e.yaml down -v
 
-  # E2E(Playwright・UI層)。Hurl とは別ジョブ = 別ランナー = 別フレッシュ DB(e2e/README.md の前提を満たす)
-  e2e-playwright:
+  # E2E(Playwright・UI層)。API 層とは別ジョブ = 別ランナー = 別フレッシュ DB(e2e/README.md の前提を満たす)
+  e2e-ui:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
@@ -258,7 +264,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
-          name: e2e-playwright-results
+          name: e2e-ui-results
           path: |
             web/playwright-report/
             web/test-results/
@@ -271,7 +277,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [core, web, eval, db, e2e-hurl, e2e-playwright]
+    needs: [core, web, eval, db, e2e-api, e2e-ui]
     runs-on: ubuntu-latest
     steps:
       - name: すべてのジョブが green(または変更なしで skip)であることを確認

@@ -5,7 +5,7 @@
 services:
   moka-core:
     ports:
-      - "127.0.0.1:8080:8080" # hurl がホストから叩くため(e2e 実行時のみ公開)
+      - "127.0.0.1:8080:8080" # API 層の Playwright がホストから叩くため(e2e 実行時のみ公開)
     environment:
       # fixture は docker ネットワーク内 = プライベート IP なので SSRF ガードを緩和(e2e 限定)
       MOKA_FEED_ALLOW_PRIVATE: "true"

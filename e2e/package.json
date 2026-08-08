@@ -1,0 +1,26 @@
+{
+	"name": "moka-e2e",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"description": "moka-1 の API / エッジ E2E(Playwright)。UI 層は web/tests/e2e/",
+	"scripts": {
+		"test": "playwright test",
+		"test:edge": "playwright test --config playwright.edge.config.ts",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"check": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@playwright/test": "^1.61.1",
+		"@types/node": "^24",
+		"eslint": "^10.4.1",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-playwright": "^2.2.4",
+		"globals": "^17.6.0",
+		"prettier": "^3.8.3",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.60.1"
+	}
+}

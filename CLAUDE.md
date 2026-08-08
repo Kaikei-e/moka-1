@@ -75,9 +75,18 @@ atlas migrate lint --env local --latest 1 # 破壊的変更の検査
 # --env local は DATABASE_URL を参照(dev-database は pgvector イメージ、atlas.hcl 参照)
 ```
 
-### E2E (Hurl + Playwright)
+### E2E (Playwright — 全層)
 
-フレッシュDB前提・compose.e2e.yaml オーバーレイ込み。手順は `e2e/README.md`。API 層は Hurl(DB依存シナリオのため `--jobs 1`)、UI 層は Playwright(`web/tests/e2e/`、`cd web && pnpm test:e2e`、workers=1)。両者は別々のフレッシュ DB で走らせる。
+フレッシュDB前提・compose.e2e.yaml オーバーレイ込み。手順は `e2e/README.md`。**Hurl とシェルスクリプトは廃止し、E2E は全層 Playwright に統一した(ADR00024)**。
+
+```bash
+cd e2e && pnpm test        # API 層(moka-core の HTTP API、tests/api/)
+cd e2e && pnpm test:edge   # エッジ層(Plecto、tests/edge/。本番スタックの Phase 2 配線が前提)
+cd web && pnpm test:e2e    # UI 層(web/tests/e2e/)
+cd e2e && pnpm lint && pnpm check   # ローカル CI パリティ
+```
+
+API 層と UI 層は**別々のフレッシュ DB** で走らせる(どちらも登録シナリオを含むため)。API / エッジ層はブラウザを起動しない(`request` フィクスチャのみ)ので `playwright install` は不要。DB 依存の直列シナリオなので `workers: 1` + `fullyParallel: false` + `retries: 0`、**実行順序はファイル名の 2 桁ゼロ埋め連番**が決める(Playwright はパスの辞書順で並べる — 数値順ではない)。
 
 ## 規約
 
