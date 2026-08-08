@@ -15,7 +15,11 @@ export default defineConfig({
 	retries: 0,
 	forbidOnly: !!process.env.CI,
 	timeout: 60_000,
-	expect: { timeout: 15_000 },
+	expect: {
+		timeout: 15_000,
+		// expect.toPass() の既定タイムアウトは 0(無限)なので有限の既定を与える
+		toPass: { timeout: 60_000, intervals: [500, 1000, 2000] }
+	},
 
 	use: {
 		baseURL: edgeBaseURL,

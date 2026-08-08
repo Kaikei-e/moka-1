@@ -25,11 +25,13 @@ Alt との違い — **CDC(Pact)フェーズはない**:
 | 変更対象 | ツール | 置き場所 |
 |---|---|---|
 | moka-web の UI / ユーザーフロー | Playwright | `web/tests/e2e/*.spec.ts` |
-| moka-core の HTTP API | Hurl | `e2e/hurl/core/*.hurl` |
-| Plecto フィルタ(認証・レート制限等) | Hurl(Plecto 経由で叩く) | `e2e/hurl/edge/*.hurl` |
-| フルスタック(UI が新 API を呼ぶ) | 両方: Playwright 1 本 + Hurl 1 本 | 上記両方 |
+| moka-core の HTTP API | Playwright(`request` フィクスチャ) | `e2e/tests/api/NN-*.spec.ts` |
+| Plecto フィルタ(認証・レート制限等) | Playwright(Plecto 経由で叩く) | `e2e/tests/edge/NN-*.spec.ts` |
+| フルスタック(UI が新 API を呼ぶ) | 両方: `web/tests/e2e/` 1 本 + `e2e/tests/api/` 1 本 | 上記両方 |
 | 内部リファクタ(外部振る舞い不変) | **Phase 0 スキップ** → Phase 1 へ | — |
-| エージェントループの無人動作(ハイライト生成等) | Hurl(トリガー API + 結果ポーリング) | `e2e/hurl/agent/*.hurl` |
+| エージェントループの無人動作(ハイライト生成等) | Playwright(トリガー API + `expect.poll` で結果待ち) | `e2e/tests/api/NN-*.spec.ts` |
+
+E2E は全層 Playwright に統一されている([[ADR00024]])。Hurl とシェルスクリプトは廃止済み。
 
 ### Playwright の書き方
 
@@ -41,13 +43,20 @@ Alt との違い — **CDC(Pact)フェーズはない**:
 - 決定的に: フィード・記事は fixture で seed する。「DB に入っている何か」に依存しない
 - LLM 依存の表示(要約・ハイライト)は **存在と形をアサートし、内容の文言をアサートしない**
 
-### Hurl の書き方
+### API / エッジ層(`e2e/`)の書き方
 
-- ホスト・トークンは `--variable host=...` で渡す。`http://localhost:...` のハードコード禁止
-- ビジネスエンドポイントの前に health-gate: `--retry 10 --retry-interval 2000` で `/healthz` を待つ
-- **DB 依存シナリオは `--jobs 1`**(FK / sequence の順序が並列で壊れる)
-- アサーション: 暗黙(status / headers)→ 明示 `jsonpath` の順。`contains` / `matches /regex/` / `isIsoDate` / `isUuid` / `count == N` を使い分ける
-- リクエスト連鎖は `[Captures]` + `{{var}}`。setup をファイル間で複製しない
+- ホストは `support/env.ts` の定数(`coreBaseURL` / `edgeBaseURL`、環境変数で上書き可)。`http://localhost:...` のハードコード禁止
+- health-gate は `tests/setup/` の setup プロジェクトに集約済み。**spec に重複して書かない**
+- **DB 依存シナリオなので `workers: 1` + `fullyParallel: false` + `retries: 0`**(FK / sequence の順序が並列で壊れる、途中状態からの再試行は「ちょうど N 件」を再現しない)
+- **実行順序はファイル名の 2 桁ゼロ埋め連番**。Playwright はパスの**辞書順**で並べる(数値順ではない)。順序の前提はファイル冒頭のコメントと `e2e/README.md` の表に書く
+- ファイル冒頭に `test.describe.configure({ mode: 'serial' })`。1 つ落ちたら後続をスキップする
+- 非同期の完了待ち(濃縮・埋め込み・スケジューラ)は `expect.poll` / `expect(...).toPass({ intervals, timeout })`。**`waitForTimeout` や素の sleep は禁止**。`toPass` の既定 timeout は 0(無限)なので必ず明示する
+- レスポンス封筒は `support/types.ts` の型を使い、`json<T>(res)` で型を付ける(`any` 禁止)
+- SSE は `support/sse.ts` の `sseEventNames()` で**イベント順**まで表明する
+- 複数の `Set-Cookie` は `res.headersArray()` で取る(`res.headers()` は `\n` 結合される)
+- `302` を観測するときは `{ maxRedirects: 0 }`(Playwright は既定で最大 20 まで追う)
+- `docker compose` 操作は `support/compose.ts` 経由に限る。後始末は `afterAll`(+ `global-teardown.ts` の安全網)
+- setup をファイル間で複製しない — 繰り返す手順は `support/moka-api.ts` へ
 - CI フラグ: `--test --report-junit reports/junit.xml`
 
 ### 手順

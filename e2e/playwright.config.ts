@@ -20,10 +20,19 @@ export default defineConfig({
 
 	forbidOnly: !!process.env.CI,
 
+	// 12-rag-failsoft.spec.ts が止めた e2e-llm-mock を、Ctrl-C(SIGINT)で中断した場合でも
+	// 確実に再開するための安全網。afterAll と teardown プロジェクトは SIGINT では走らない
+	globalTeardown: './global-teardown.ts',
+
 	// enrich.Scheduler の自動濃縮・埋め込み待ちを含むシナリオがあるため長め。
 	// さらに長いものは spec 側で test.setTimeout する
 	timeout: 120_000,
-	expect: { timeout: 15_000 },
+	expect: {
+		timeout: 15_000,
+		// expect.toPass() の既定タイムアウトは 0(無限)で expect.timeout を見ない。
+		// 書き忘れがそのままハングにならないよう、有限の既定をここで与える
+		toPass: { timeout: 60_000, intervals: [500, 1000, 2000] }
+	},
 
 	use: {
 		baseURL: coreBaseURL,

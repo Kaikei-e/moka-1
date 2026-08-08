@@ -32,8 +32,12 @@ export function expectFloat(value: unknown, label = 'value'): void {
 	expect(Number.isFinite(value as number), `${label} は有限の数であること`).toBe(true);
 }
 
-/** Hurl の `jsonpath "$.x" matches /.+/` 相当(空でない文字列)。 */
+/**
+ * Hurl の `jsonpath "$.x" matches /.+/` 相当。
+ * Hurl の `matches` は非アンカーの部分一致で、文字列以外を受け取ると型エラーになる。
+ * `.` は改行にマッチしないので「改行だけの文字列」は落ちる — その挙動ごと写す。
+ */
 export function expectNonEmptyString(value: unknown, label = 'value'): void {
 	expect(typeof value, `${label} は文字列であること`).toBe('string');
-	expect((value as string).length, `${label} は空でないこと`).toBeGreaterThan(0);
+	expect(value as string, `${label} は空でないこと`).toMatch(/.+/);
 }
