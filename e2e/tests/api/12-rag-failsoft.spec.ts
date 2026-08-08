@@ -9,30 +9,28 @@
 // 移行元: hurl/core/rag_failsoft_e2e.sh + hurl/core/rag_failsoft.hurl
 //
 // 前提: フレッシュ DB + 記事が投入済み(01-feeds-and-articles.spec.ts 等)であること。
-// health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に集約済みなのでここでは打たない。
+// なお冒頭の health gate(rag_failsoft.hurl #1)は tests/setup/core-health.setup.ts へ集約
+// **しない** — setup プロジェクトは llm を止める前に走るので「moka-core 自体は llm 停止に
+// 関係なく生きている(コアパスは無傷)」という別の主張になるため、停止後の test として残す。
 //
-// test.beforeAll では { request } フィクスチャを使えない(Playwright がフック終了時に dispose し、
-// 後続の test で使うと「Fixture { request } from beforeAll cannot be reused in a test.」で落ちる —
-// 調査ダイジェスト §0-3 / 共通ルール #4)ため、docker compose 操作(stopService/startService)だけを
-// beforeAll/afterAll で行う。旧 bash は「記事 id を先に取ってから llm を止める」順序だったが、
-// 記事一覧の取得(コアパス)は llm に依存しないため、beforeAll で先に llm を止めても結果は変わらない。
+// 手順の順序は旧 bash のまま(1. 記事 id を先に取る → 2. llm を止める → 3. 検証)。
+// docker compose 操作(stopService)は test 本体から行う: test.beforeAll では { request }
+// フィクスチャを使えず(Playwright がフック終了時に dispose し、後続の test で使うと
+// 「Fixture { request } from beforeAll cannot be reused in a test.」で落ちる —
+// 調査ダイジェスト §0-3 / 共通ルール #4)、「記事 id を先に取ってから止める」順序を
+// beforeAll では表現できないため。再開だけは HTTP を伴わないので afterAll に置ける。
 //
 // 変数: articleId は「id を取得する」test() から Q&A の test() まで参照するので、
 // モジュールスコープの変数に置く(旧 bash の article_id 変数に相当)。
 import { test, expect } from '@playwright/test';
 import { firstArticleId, json, postSse } from '../../support/moka-api';
-import { sseEventNames, sseData } from '../../support/sse';
+import { expectEventStream, sseEventNames, sseData } from '../../support/sse';
 import { stopService, startService } from '../../support/compose';
 import type { SearchResponse } from '../../support/types';
 
 test.describe.configure({ mode: 'serial' });
 
-// 2. llm(モック)を止める。以降 moka-core からの補完・埋め込みは接続エラーになる
-test.beforeAll(() => {
-	stopService('e2e-llm-mock');
-});
-
-// 終了時に必ず再開する
+// 終了時に必ず再開する。stop に到達していなくても start は冪等なので無条件に呼ぶ
 // (旧 bash: trap '"${COMPOSE[@]}" start e2e-llm-mock >/dev/null 2>&1 || true' EXIT)
 test.afterAll(() => {
 	startService('e2e-llm-mock', { allowFail: true });
@@ -40,13 +38,34 @@ test.afterAll(() => {
 
 let articleId: number;
 
-// 1. 質問対象の記事 id を先に取っておく(どの記事でもよい — 存在することだけが前提)
-test('1. 質問対象の記事 id を取得する(どの記事でもよい)', async ({ request }) => {
-	articleId = await firstArticleId(request);
+test('1-2. 質問対象の記事 id を先に取っておき、llm(モック)を止める', async ({ request }) => {
+	await test.step('1. 質問対象の記事 id を先に取っておく(どの記事でもよい — 存在することだけが前提)', async () => {
+		// 旧 bash は curl + jq で取れなければ「no articles found (run after feeds_and_articles.hurl)」
+		// として exit 1 していた。firstArticleId が「記事が1件以上あること」を主張する
+		articleId = await firstArticleId(request);
+	});
+
+	await test.step('2. llm(モック)を止める。以降 moka-core からの補完・埋め込みは接続エラーになる', () => {
+		stopService('e2e-llm-mock');
+	});
 });
 
-// 2. llm 停止時も検索は 200 — pg_trgm テキスト側単独への縮退(RRF のベクトル側は空)
-test('2. llm 停止時も検索は 200 — pg_trgm テキスト側単独への縮退(RRF のベクトル側は空)', async ({
+// 3. health gate — moka-core 自体は llm 停止に関係なく生きている(コアパスは無傷)
+test('3. health gate — moka-core 自体は llm 停止に関係なく生きている(コアパスは無傷)', async ({
+	request
+}) => {
+	// 移行元 rag_failsoft.hurl #1。Hurl: retry: 10, retry-interval: 2000 → 10回の追加試行 = 最大20秒
+	await expect
+		.poll(async () => (await request.get('/healthz')).status(), {
+			intervals: [2000],
+			timeout: 20_000
+		})
+		.toBe(200);
+});
+
+// 4. llm 停止時も検索は 200 — pg_trgm テキスト側単独への縮退(RRF のベクトル側は空)
+// (移行元 rag_failsoft.hurl #2)
+test('4. llm 停止時も検索は 200 — pg_trgm テキスト側単独への縮退(RRF のベクトル側は空)', async ({
 	request
 }) => {
 	const response = await request.get('/api/v1/search', { params: { q: 'Third article' } });
@@ -58,29 +77,28 @@ test('2. llm 停止時も検索は 200 — pg_trgm テキスト側単独への�
 	expect(first!.title, 'items[0].title が "Third article" であること').toBe('Third article');
 });
 
-// 2b. ヒットなしは 200 の空配列(null でなく [] — 一覧 API と同じ契約)。
+// 4b. ヒットなしは 200 の空配列(null でなく [] — 一覧 API と同じ契約)。
 // 埋め込みが効いている通常時はベクトル近傍が必ず何か返す(top-k に閾値は無い)ため、
 // この契約はクエリ埋め込みが縮退で空になる llm 停止時にだけ決定的に観測できる
-// (search.hurl #6 の注記と対)
-test('2b. ヒットなしは 200 の空配列(null でなく [])', async ({ request }) => {
+// (03-search.spec.ts #6 の注記と対。移行元 rag_failsoft.hurl #2b)
+test('4b. ヒットなしは 200 の空配列(null でなく [])', async ({ request }) => {
 	const response = await request.get('/api/v1/search', { params: { q: 'qqqzzzxxxvvv' } });
 	expect(response.status(), await response.text()).toBe(200);
 	const body = await json<SearchResponse>(response);
 	expect(body.items, 'items が空配列であること').toHaveLength(0);
 });
 
-// 3. Q&A は sources(文脈選定はテキスト検索で成立)まで届いた後、回答生成で llm に
+// 5. Q&A は sources(文脈選定はテキスト検索で成立)まで届いた後、回答生成で llm に
 // 到達できず error イベントになる。done は出ない。message はドメイン sentinel の写像
-test('3. Q&A は sources まで届いた後、回答生成で llm に到達できず error イベントになる(done は出ない)', async ({
+// (移行元 rag_failsoft.hurl #3)
+test('5. Q&A は sources まで届いた後、回答生成で llm に到達できず error イベントになる(done は出ない)', async ({
 	request
 }) => {
 	const response = await postSse(request, `/api/v1/articles/${articleId}/qa`, {
 		question: 'llm が居ないとどうなりますか'
 	});
 	expect(response.status(), await response.text()).toBe(200);
-	expect(response.headers()['content-type'], 'Content-Type が text/event-stream であること').toBe(
-		'text/event-stream'
-	);
+	expectEventStream(response);
 
 	const body = await response.text();
 
@@ -96,6 +114,8 @@ test('3. Q&A は sources まで届いた後、回答生成で llm に到達で�
 		eventNames,
 		'event: done を含まないこと(回答生成で llm に到達できず終了する)'
 	).not.toContain('done');
+	// 旧 Hurl の `body not contains "event: done"` — パース済みイベント名と生ボディの両方で否定する
+	expect(body, 'body が "event: done" を含まないこと').not.toContain('event: done');
 	// sources が error より先に届く(コメントの因果順「sources まで届いた後、…error イベントになる」
 	// の主張 — 旧 Hurl は body contains の部分文字列一致でしか書けなかった箇所。移行による正しい強化)
 	expect(eventNames.indexOf('sources'), 'sources が error より先に来ること').toBeLessThan(

@@ -4,9 +4,13 @@
 // それでも中身が見える(GET のみで確認できる)ことそのものが M1 の Done 条件の主張。
 // 移行元: hurl/core/enrich_e2e.sh + hurl/core/enrich_poll.hurl
 //
-// 前提: フレッシュ DB。health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に
-// 集約済みなのでここでは打たない。実行順序は 08-dedupe-no-304.spec.ts の直後(README.md の
-// 実行順序表)。独自フィード(fixtures.enrich)を登録するので他の厳密なカウントには影響しない。
+// 前提: moka-core / e2e-fixtures / e2e-db / e2e-llm-mock が起動済み、フレッシュ DB。
+// (濃縮は llm を叩くので e2e-llm-mock が生きている必要がある — e2e-llm-mock を止める
+// 12-rag-failsoft.spec.ts より必ず前に置くこと。)
+// health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に集約済みなので
+// ここでは打たない。他の厳密なカウントアサーション(01-feeds-and-articles.spec.ts 等)を
+// 崩さないよう独自フィード(fixtures.enrich)を登録するので、10-scheduler.spec.ts の直前
+// (最後の方)に置く = 08-dedupe-no-304.spec.ts の直後(README.md の実行順序表)。
 //
 // 変数: articleId は「guid で記事を特定する」test() から、summary/tags のポーリングを行う
 // test() まで複数の test() をまたいで参照するので、モジュールスコープの変数に置く

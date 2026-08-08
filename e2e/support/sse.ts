@@ -7,6 +7,8 @@
 //
 // 書式は core/internal/httpapi の writeEvent と 1:1: `event: <name>\ndata: <json>\n\n`
 
+import { expect, type APIResponse } from '@playwright/test';
+
 export type SseEvent = {
 	name: string;
 	/** data 行の生文字列(複数行 data は改行で連結)。 */
@@ -50,4 +52,24 @@ export function sseDeltaText(body: string): string {
 	return sseEventsNamed(body, 'delta')
 		.map((e) => (JSON.parse(e.data) as { text?: string }).text ?? '')
 		.join('');
+}
+
+/**
+ * Hurl の `header "Content-Type" == "text/event-stream"` 相当。
+ * moka-core は charset を付けずにこの値そのものを設定する
+ * (`core/internal/httpapi/{qa,summarize}.go`)ので完全一致で見る。
+ */
+export function expectEventStream(response: APIResponse): void {
+	expect(response.headers()['content-type'], 'Content-Type が text/event-stream であること').toBe(
+		'text/event-stream'
+	);
+}
+
+/**
+ * Hurl の `body not contains "event: error"` 相当。パース済みイベント名と生ボディの
+ * 両方で否定する — パーサの取りこぼしで否定が空振りすることを防ぐ。
+ */
+export function expectNoSseError(body: string): void {
+	expect(sseEventNames(body), 'error イベントを含まないこと').not.toContain('error');
+	expect(body, 'body が "event: error" を含まないこと').not.toContain('event: error');
 }

@@ -2,13 +2,18 @@
 // 移行元: hurl/core/read_and_feed_delete.hurl
 //
 // 前提: フレッシュ DB。health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に
-// 集約済みなのでここでは打たない。実行順序は 05-articles-null-published-at.spec.ts の直後(README.md
-// の実行順序表を参照)— 一覧の先頭2件が urn:moka-e2e-null:1(fallback で全記事中最新) /
-// urn:moka-e2e:3 である前提を使う。末尾で null-pubdate フィードを削除するため、このファイルは
-// 「厳密なカウント」に依存する連番グループの最後に置いてある(後続の 07 以降は独自フィードだけを
-// 使うので影響しない)。
+// 集約済みなのでここでは打たない。実行順序は 01-feeds-and-articles(25記事)/ 02-summarize /
+// 05-articles-null-published-at(3記事)の後 — 05 の直後に走ること(README.md の実行順序表を参照)。
+// 一覧の先頭2件が urn:moka-e2e-null:1(fallback で全記事中最新) / urn:moka-e2e:3 である前提を使う。
+// 末尾で null-pubdate フィードを削除するため、このファイルは「厳密なカウント」に依存する連番
+// グループの最後に置いてある(後続の 08-dedupe-no-304 / 10-scheduler は独自フィードだけを使い、
+// 07-auth はフィードに触れないので影響しない)。旧 Hurl の `--jobs 1`(DB 依存シナリオなので直列)は
+// playwright.config.ts の fullyParallel: false + workers: 1 が受け持つ。
 //
-// 変数: nullArticleId(null-pubdate フィードの先頭記事 id)/ readArticleId(既読マーク対象の記事 id)/
+// 変数: 旧 Hurl の `--variable host=...` は playwright.config.ts の use.baseURL(support/env.ts の
+// coreBaseURL)へ、`--variable fixture_url=...` / `--variable null_pubdate_fixture_url=...` は下の
+// fixtureURL(fixtures.main) / fixtureURL(fixtures.nullPubDate) へ移した。
+// nullArticleId(null-pubdate フィードの先頭記事 id)/ readArticleId(既読マーク対象の記事 id)/
 // delFeedId(削除対象フィード id)は、記事一覧の捕捉からフィード削除の確認まで複数の test() を
 // またいで参照するので、モジュールスコープの変数に置く(旧 Hurl の [Captures] 相当)。
 // test.describe.configure({ mode: 'serial' }) によりこのファイル内は直列実行(1つ落ちたら

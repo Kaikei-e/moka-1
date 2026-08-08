@@ -5,8 +5,11 @@
 // (通常の再登録シナリオは 01-feeds-and-articles.spec.ts 側で 304 経路を検証済み)。
 // 移行元: hurl/core/dedupe_no_304_e2e.sh + hurl/core/dedupe_no_304.hurl
 //
-// 前提: フレッシュ DB。health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に
-// 集約済みなのでここでは打たない。実行順序は 07-auth.spec.ts の直後(README.md の実行順序表)。
+// 前提: moka-core / e2e-fixtures / e2e-db が起動済み、フレッシュ DB。
+// (フィクスチャの配信実体を書き換えて ETag を動かすシナリオなので、e2e-fixtures が
+// e2e/fixtures/ を ro bind mount して配信していることが本質的な前提。)
+// health gate は tests/setup/core-health.setup.ts(setup プロジェクト)に集約済みなので
+// ここでは打たない。実行順序は 07-auth.spec.ts の直後(README.md の実行順序表)。
 // 独自フィード(fixtures.dedupe)を登録するので、以降は「厳密なカウント」に依存しない
 // (01〜06 のグループの後に置いてある理由)。
 //

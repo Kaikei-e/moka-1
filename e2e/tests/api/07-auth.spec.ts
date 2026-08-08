@@ -104,7 +104,8 @@ test('register の失敗した儀式は状態を変えず、challenge は一度�
 });
 
 // ---- パスキー管理・ログアウト(fresh DB で確認できる境界のみ。実資格情報を伴う一覧・削除の
-// 実地検証は儀式完走が要るため Playwright(08-account-passkeys.spec.ts)の領分)----
+// 実地検証は儀式完走が要るため UI 層 Playwright(web/tests/e2e/08-account-passkeys.spec.ts)の
+// 領分)----
 
 // 7. 未登録 = 一覧は空配列
 test('7. 未登録では passkeys 一覧が空配列であること', async ({ request }) => {
@@ -147,12 +148,10 @@ test('10. logout はセッション無しでも 200 で、cookie を失効させ
 		.filter((header) => header.name.toLowerCase() === 'set-cookie')
 		.map((header) => header.value);
 	expect(setCookieValues.length, 'Set-Cookie ヘッダが存在すること').toBeGreaterThanOrEqual(1);
-	expect(
-		setCookieValues.some((value) => value.includes('moka_session=')),
-		'header "Set-Cookie" contains "moka_session="'
-	).toBe(true);
-	expect(
-		setCookieValues.some((value) => value.includes('Max-Age=0')),
-		'header "Set-Cookie" contains "Max-Age=0"'
-	).toBe(true);
+	// hurl 側の 2 つの `header "Set-Cookie" contains ...` は、logout が返す Set-Cookie が
+	// 1本だけなので「同一の cookie 文字列が両方を含む」ことを主張していた。2つの述語を
+	// 別々の cookie で満たしてしまわないよう、moka_session の1本を掴んでから両方を見る
+	const sessionCookie = setCookieValues.find((value) => value.includes('moka_session='));
+	expect(sessionCookie, 'header "Set-Cookie" contains "moka_session="').toBeDefined();
+	expect(sessionCookie, 'header "Set-Cookie" contains "Max-Age=0"').toContain('Max-Age=0');
 });

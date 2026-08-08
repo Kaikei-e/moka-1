@@ -5,13 +5,17 @@
 // 集約済みなのでここでは打たない。実行順はファイル名の連番がそのまま前提になる: 01-feeds-and-articles
 // (25記事)/ 02-summarize / 03-search / 04-qa の後に走ること。NULL 記事が fallback で一覧の先頭に来る
 // ため、02〜04 の「limit=1 で先頭記事を掴む」前提を崩す — だからこのファイルはそれらより後ろに置いて
-// ある(e2e/README.md の実行順序表を参照)。
+// ある(e2e/README.md の実行順序表を参照)。旧 Hurl の `--jobs 1`(DB 依存シナリオなので直列)は
+// playwright.config.ts の fullyParallel: false + workers: 1 が受け持つ。
 //
 // フィクスチャは3記事: item1 は pubDate 無し(published_at NULL、fallback で「今」扱い
 // = 全記事中で最新になるはず)。item2(2026-04-01)/item3(2026-03-01)は feed.xml 側の
 // 日付レンジ(2026-06-07〜07-01)より確実に古い過去日付にしてあり、他ファイルの記事と混線しない。
 //
-// 変数: cursor1 / cursor2 は3ページを繋ぐカーソル(旧 Hurl の [Captures] cursor_1 / cursor_2 相当)。
+// 変数: 旧 Hurl の `--variable host=...` は playwright.config.ts の use.baseURL(support/env.ts の
+// coreBaseURL)へ、`--variable null_pubdate_fixture_url=http://e2e-fixtures/feed-null-pubdate.xml`
+// (例)は下の fixtureURL(fixtures.nullPubDate) へ移した。
+// cursor1 / cursor2 は3ページを繋ぐカーソル(旧 Hurl の [Captures] cursor_1 / cursor_2 相当)。
 // 3ページとも同一シナリオの中でしか使わないので、1つの test() の中で test.step ごとに
 // 取り直しながら使い切るローカル変数で足りる(モジュールスコープへ昇格させる必要はない)。
 import { test, expect } from '@playwright/test';
@@ -50,7 +54,7 @@ test('記事一覧を3ページ通して読み、NULL published_at のフォー�
 		cursor1 = body.next_cursor as string;
 	});
 
-	// 4. 続く25件(feeds_and_articles.hurl のフィクスチャ、2026-07-01〜06-07)を丸ごと1ページで
+	// 4. 続く25件(01-feeds-and-articles.spec.ts のフィクスチャ、2026-07-01〜06-07)を丸ごと1ページで
 	// 消費する。published_at が NULL だった item1 が重複して混ざり込まないことを確認する
 	await test.step('4. 続く25件を丸ごと1ページで消費し、NULL 記事(item1)が重複混入しないこと', async () => {
 		const body = await listArticles(request, { limit: 25, cursor: cursor1 });

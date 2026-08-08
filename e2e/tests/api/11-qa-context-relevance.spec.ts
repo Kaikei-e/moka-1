@@ -24,7 +24,7 @@ import { test, expect } from '@playwright/test';
 import { fixtureURL, fixtures } from '../../support/env';
 import { registerFeedOk, findArticleByGuid, json, postSse } from '../../support/moka-api';
 import type { SearchResponse } from '../../support/types';
-import { sseEventNames, sseData } from '../../support/sse';
+import { expectEventStream, expectNoSseError, sseEventNames, sseData } from '../../support/sse';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -52,22 +52,24 @@ test('1-2. フィクスチャフィードを登録して対象記事(記事1)の
 
 test('3. ベクトル側(article_embeddings)が対象記事を埋め込み終わるまで待つ', async ({ request }) => {
 	// テキスト側(pg_trgm)だけでも観測できるはずのシグナルだが、埋め込みが効いた通常状態で
-	// 検証する。元は `until curl .../search?q=Zyloforge%20Marmalade | jq '.items|length>=1'` を
-	// 最大30回・2秒間隔でポーリング(約60秒でタイムアウト)。test.setTimeout で余裕を持たせる
-	test.setTimeout(90_000);
-	await expect
-		.poll(
-			async () => {
-				const response = await request.get('/api/v1/search', {
-					params: { q: 'Zyloforge Marmalade' }
-				});
-				expect(response.status(), await response.text()).toBe(200);
-				const body = await json<SearchResponse>(response);
-				return body.items.length;
-			},
-			{ intervals: [2000], timeout: 60_000 }
-		)
-		.toBeGreaterThanOrEqual(1);
+	// 検証する。元は `until curl -sf .../search?q=Zyloforge%20Marmalade | jq -e '.items|length>=1'`
+	// を最大30回・2秒間隔でポーリング(約60秒でタイムアウト)。
+	//
+	// expect.poll ではなく toPass を使う: expect.poll は「取得関数そのものが投げた例外」を
+	// 再試行せずそのまま送出する(matcher の失敗しか再試行しない)。旧 `until curl -sf` は
+	// HTTP エラーでも再試行していたので、リクエスト/ステータス検査ごと再試行する toPass が
+	// 忠実な対応になる。config の既定テスト timeout(120秒)が 60秒のポーリングを覆う
+	await expect(async () => {
+		const response = await request.get('/api/v1/search', {
+			params: { q: 'Zyloforge Marmalade' }
+		});
+		expect(response.status(), await response.text()).toBe(200);
+		const body = await json<SearchResponse>(response);
+		expect(
+			body.items.length,
+			'対象記事の埋め込みが済み、タイトル語のクエリが1件以上ヒットすること'
+		).toBeGreaterThanOrEqual(1);
+	}).toPass({ intervals: [2000], timeout: 60_000 });
 });
 
 test('4. 質問(トピック語なし)へのクエリ配線を検証する — distractor_marker(記事2)が sources に現れること', async ({
@@ -80,15 +82,14 @@ test('4. 質問(トピック語なし)へのクエリ配線を検証する — d
 		question: 'この記事の要点を教えてください'
 	});
 	expect(response.status(), await response.text()).toBe(200);
-	expect(response.headers()['content-type'], 'Content-Type が text/event-stream であること').toBe(
-		'text/event-stream'
-	);
+	expectEventStream(response);
 
 	const body = await response.text();
 	const eventNames = sseEventNames(body);
 	expect(eventNames, 'event: sources が含まれること').toContain('sources');
 	expect(eventNames, 'event: done が含まれること').toContain('done');
-	expect(eventNames, 'event: error を含まないこと').not.toContain('error');
+	// 旧 Hurl の `body not contains "event: error"`
+	expectNoSseError(body);
 	expect(
 		eventNames.indexOf('sources'),
 		'sources が done より先に来ること(文脈記事は回答生成の前に届く)'

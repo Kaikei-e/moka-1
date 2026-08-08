@@ -185,5 +185,5 @@ test('数値でない記事 id の全文取り寄せは 400', async ({ request }
 	await expectErrorResponse(response, 400);
 });
 
-// 要約(POST /summary, /summary/stream)は summarize.hurl に分離した(CI ではモック LLM を使う)
-// → 02-summarize.spec.ts へ移行(このファイルの担当外)
+// 要約(POST /summary, /summary/stream)は 02-summarize.spec.ts が受け持つ
+// (CI ではモック LLM を使う)

@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test';
 import { fixtureURL, fixtures } from '../../support/env';
 import { registerFeedOk, listArticles, expectErrorResponse, postSse } from '../../support/moka-api';
-import { sseEventNames, sseData } from '../../support/sse';
+import { expectEventStream, expectNoSseError, sseEventNames, sseData } from '../../support/sse';
 import { expectInteger } from '../../support/assertions';
 
 test.describe.configure({ mode: 'serial' });
@@ -48,14 +48,14 @@ test('4. 正常系 — SSE のイベント順: sources(文脈記事、回答生�
 		question: 'この記事の要点を教えてください'
 	});
 	expect(response.status(), await response.text()).toBe(200);
-	expect(response.headers()['content-type'], 'Content-Type が text/event-stream であること').toBe(
-		'text/event-stream'
-	);
+	expectEventStream(response);
 
 	const body = await response.text();
 
-	// sources が delta より先という順序まで表明する(旧 Hurl は body contains の部分文字列一致
-	// でしか書けなかった箇所 — ADR00024 が明示する移行による正しい強化)
+	// sources → delta → done という順序まで表明する(旧 Hurl は body contains の部分文字列一致
+	// でしか書けなかった箇所 — 移行による正しい強化)。rag.Answerer.Ask は onSources を
+	// 回答生成前にちょうど1回呼び、handleAskArticle は done を書いたら return するので、
+	// 「sources が最初・done が最後」まで契約として固定できる
 	const eventNames = sseEventNames(body);
 	const sourcesIdx = eventNames.indexOf('sources');
 	const firstDeltaIdx = eventNames.indexOf('delta');
@@ -63,12 +63,15 @@ test('4. 正常系 — SSE のイベント順: sources(文脈記事、回答生�
 	expect(sourcesIdx, 'event: sources が含まれること').toBeGreaterThanOrEqual(0);
 	expect(firstDeltaIdx, 'event: delta が含まれること').toBeGreaterThanOrEqual(0);
 	expect(doneIdx, 'event: done が含まれること').toBeGreaterThanOrEqual(0);
+	expect(eventNames[0], 'sources が最初のイベントであること').toBe('sources');
+	expect(eventNames.at(-1), 'done が最後のイベントであること').toBe('done');
 	expect(
 		sourcesIdx,
 		'sources が delta より先に来ること(文脈記事は回答生成の前に届く)'
 	).toBeLessThan(firstDeltaIdx);
 	expect(firstDeltaIdx, 'delta が done より先に来ること').toBeLessThan(doneIdx);
-	expect(eventNames, 'event: error を含まないこと').not.toContain('error');
+	// 旧 Hurl の `body not contains "event: error"`
+	expectNoSseError(body);
 
 	expect(body, 'body が question_id を含むこと').toContain('question_id');
 	expect(body, 'body が answer_id を含むこと').toContain('answer_id');

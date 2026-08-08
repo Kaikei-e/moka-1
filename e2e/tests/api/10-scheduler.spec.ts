@@ -35,6 +35,10 @@ test('1-4. フィードを v1 で登録し、取得間隔を短縮してから�
 
 	await test.step('2. フィードを登録(同期・API起点。ここまではユーザー操作の代替)', async () => {
 		const { feed } = await registerFeedOk(request, fixtureURL(fixtures.scheduler.served));
+		// 旧シェルは `set -euo pipefail` + `curl -sf | jq -r '.feed.id'` で id が取れない場合に
+		// そこで止まっていた。ここでも次の DB 直接操作(SQL 文字列の組み立て)へ壊れた値を
+		// 持ち込まないよう、id が取れたことだけ確かめる
+		expect(feed.id, 'feed.id が取れていること').toBeGreaterThan(0);
 		feedId = feed.id;
 	});
 
@@ -58,6 +62,9 @@ test('1-4. フィードを v1 で登録し、取得間隔を短縮してから�
 test('5. スケジューラが自律的に再取得して新記事が現れるまでポーリングする(人間・API操作は無し)', async ({
 	request
 }) => {
+	// scheduler_poll.hurl の受信側。直前の test() が「フィード登録 → fetch_interval_seconds を
+	// 短縮 → 配信内容を差し替え」まで済ませた後にここへ来る。人間・API 起点の操作は一切無い
+	// 状態で、記事が自然に増えることだけを確認する。
 	// Hurl: retry: 20, retry-interval: 1000 → 20回の追加試行 = 最大20秒
 	await expect(async () => {
 		const { articles } = await listArticles(request, { limit: 50 });
