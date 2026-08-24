@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-LLAMACPP_BUILD = "b9859"
+LLAMACPP_BUILD = "b10603"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EVAL_ROOT = REPO_ROOT / "eval"

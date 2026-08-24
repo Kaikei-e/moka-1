@@ -81,7 +81,7 @@ services:
   # 公式イメージ(ghcr.io/kaikei-e/plecto)固定 — ADR00005 の Revisit Trigger(公式イメージ配布)
   # が発火したためソースビルドから移行。タグは可変なので digest も併記して pin する。
   plecto:
-    image: ghcr.io/kaikei-e/plecto:0.5.3@sha256:a0be871b6a7887bd628537eb9fb4922ce7dce061db31f69feef25c5df0556c07 # minimal profile(ADR 000079)
+    image: ghcr.io/kaikei-e/plecto:0.11.1@sha256:e90dd9cfc0e9c6fabfc5ed6f6c033b9651a7b8d910681c054adc274466640b44 # minimal profile(ADR 000079)
     command: ["/run/plecto/manifest.toml"] # bind アドレスは manifest の [listen] 側(CLI引数は渡さない)
     restart: unless-stopped
     ports:
@@ -216,7 +216,7 @@ services:
 
   # ローカル推論(Vulkan 固定 — gfx1150 は ROCm 非対応、tenets §3.3)
   llm:
-    image: ghcr.io/ggml-org/llama.cpp:server-vulkan-b9859 # pin。更新は eval/ の速度実測とセットで
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan-b10603 # pin。更新は eval/ の速度実測とセットで
     restart: unless-stopped
     devices:
       - /dev/dri:/dev/dri # iGPU パススルー

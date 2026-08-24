@@ -1,7 +1,7 @@
 """llama.cpp server のアドホック起動 — compose.yaml の llm サービス定義を継承する.
 
 `docker compose run` を使うことで devices(/dev/dri)・group_add・LLAMA_CACHE・
-イメージ pin(server-vulkan-b9859)の単一の真実を compose.yaml に保つ(ADR00006)。
+イメージ pin(server-vulkan-b10603)の単一の真実を compose.yaml に保つ(ADR00006)。
 """
 
 import subprocess
